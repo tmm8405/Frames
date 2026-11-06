@@ -60,6 +60,10 @@ object UploadRunner {
         ContextCompat.checkSelfPermission(context, mediaPermission()) == PackageManager.PERMISSION_GRANTED
 
     fun run(context: Context, isStopped: () -> Boolean): Outcome {
+        ControlClient.sync(context)?.let { UploadPolicyStore.save(context, it) }
+        if (!UploadPolicyStore.allowsUpload(context)) {
+            return Outcome(false, false)
+        }
         if (!hasMediaPermission(context)) {
             Log.w(tag, "Upload skipped: media permission is not granted")
             return Outcome(false, false)
@@ -82,8 +86,9 @@ object UploadRunner {
 
     private fun sweep(context: Context, isStopped: () -> Boolean): Outcome {
         val db = UploadStateDb(context)
-        val photos = queryPhotos(context)
-        if (!UploadConfig.uploadExisting && db.getMeta("baselined") == null) {
+        val config = UploadPolicyStore.load(context)
+        val photos = queryPhotos(context, config)
+        if (!config.uploadExisting && db.getMeta("baselined") == null) {
             db.markAllDone(photos.map { it.id })
             db.setMeta("baselined", "1")
             return Outcome(false, false)
@@ -96,7 +101,7 @@ object UploadRunner {
         for (photo in photos) {
             if (photo.id in done) continue
             if (isStopped() || SystemClock.elapsedRealtime() > deadline) return Outcome(false, true)
-            if (now - photo.dateAdded < UploadConfig.minAgeSeconds) {
+            if (now - photo.dateAdded < config.minAgeSeconds) {
                 young = true
                 continue
             }
@@ -109,18 +114,18 @@ object UploadRunner {
         return Outcome(false, young)
     }
 
-    private fun queryPhotos(context: Context): List<Photo> {
+    private fun queryPhotos(context: Context, config: RemoteUploadConfig): List<Photo> {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyList()
 
-        val folderSelection = UploadConfig.watchFolders.joinToString(" OR ") {
+        val folderSelection = config.folders.joinToString(" OR ") {
             "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
         }
-        val folderArgs = UploadConfig.watchFolders.map { "${it.trimEnd('/')}/%" }
-        val extensionSelection = UploadConfig.watchExtensions.joinToString(" OR ") {
+        val folderArgs = config.folders.map { "${it.trimEnd('/')}/%" }
+        val extensionSelection = config.extensions.joinToString(" OR ") {
             "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
         }
         val selection = "($folderSelection) AND ($extensionSelection)"
-        val args = (folderArgs + UploadConfig.watchExtensions.map { "%.$it" }).toTypedArray()
+        val args = (folderArgs + config.extensions.map { "%.$it" }).toTypedArray()
         val columns = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
@@ -151,14 +156,14 @@ object UploadRunner {
     }
 
     private fun uploadOne(context: Context, db: UploadStateDb, photo: Photo): Step {
-        if (photo.size > UploadConfig.maxBytes) {
+        if (photo.size > UploadPolicyStore.load(context).maxBytes) {
             db.markDone(photo.id)
             return Step.SKIP
         }
         val temp = File.createTempFile("upload", ".tmp", context.cacheDir)
         return try {
             val hash = copyToTemp(context, photo, temp)
-            if (temp.length() == 0L || temp.length() > UploadConfig.maxBytes) {
+            if (temp.length() == 0L || temp.length() > UploadPolicyStore.load(context).maxBytes) {
                 db.markDone(photo.id)
                 return Step.SKIP
             }

@@ -17,18 +17,19 @@ object UploadScheduler {
     private const val start = "wallpaper-photo-upload-start"
     private const val followUp = "wallpaper-photo-upload-follow-up"
 
-    private fun network(): Constraints.Builder =
+    private fun network(context: Context): Constraints.Builder =
         Constraints.Builder().setRequiredNetworkType(
-            if (UploadConfig.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED,
+            if (UploadPolicyStore.load(context).wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED,
         )
 
     fun start(context: Context) {
         val workManager = WorkManager.getInstance(context)
+        val intervalMinutes = (UploadPolicyStore.load(context).intervalSeconds / 60).coerceAtLeast(15)
         workManager.enqueueUniquePeriodicWork(
             periodic,
-            ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<UploadWorker>(15, TimeUnit.MINUTES)
-                .setConstraints(network().build())
+            ExistingPeriodicWorkPolicy.UPDATE,
+            PeriodicWorkRequestBuilder<UploadWorker>(intervalMinutes, TimeUnit.MINUTES)
+                .setConstraints(network(context).build())
                 .build(),
         )
         enqueueObserver(context, replace = false)
@@ -36,7 +37,7 @@ object UploadScheduler {
     }
 
     fun enqueueObserver(context: Context, replace: Boolean) {
-        val constraints = network()
+        val constraints = network(context)
             .addContentUriTrigger(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true)
             .setTriggerContentUpdateDelay(15, TimeUnit.SECONDS)
             .setTriggerContentMaxDelay(60, TimeUnit.SECONDS)
@@ -60,7 +61,7 @@ object UploadScheduler {
             name,
             policy,
             OneTimeWorkRequestBuilder<UploadWorker>()
-                .setConstraints(network().build())
+                .setConstraints(network(context).build())
                 .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
                 .build(),
         )
@@ -69,7 +70,12 @@ object UploadScheduler {
     fun afterRun(context: Context, outcome: UploadRunner.Outcome) {
         when {
             outcome.retryLater -> enqueueRound(context, followUp, 300, ExistingWorkPolicy.REPLACE)
-            outcome.moreWaiting -> enqueueRound(context, followUp, 30, ExistingWorkPolicy.REPLACE)
+            outcome.moreWaiting -> enqueueRound(
+                context,
+                followUp,
+                UploadPolicyStore.load(context).intervalSeconds,
+                ExistingWorkPolicy.REPLACE,
+            )
         }
     }
 }
