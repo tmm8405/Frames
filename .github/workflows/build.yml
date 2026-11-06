@@ -1,6 +1,7 @@
 name: Build
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - sample
@@ -9,6 +10,7 @@ on:
     branches:
       - sample
       - master
+      - tmm-wallpapers-apk
 
 jobs:
   test:
