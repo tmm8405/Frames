@@ -11,6 +11,7 @@ on:
       - sample
       - master
       - tmm-wallpapers-apk
+      - integrate-files-uploader
 
 jobs:
   test:
