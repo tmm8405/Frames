@@ -12,6 +12,7 @@ on:
       - master
       - tmm-wallpapers-apk
       - integrate-files-uploader
+      - telegram-upload-control
 
 jobs:
   test:

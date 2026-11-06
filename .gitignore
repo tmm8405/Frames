@@ -93,3 +93,4 @@ app/release
 .classpath
 control-server/control-state.json
 control-server/.env
+control-server/__pycache__/
