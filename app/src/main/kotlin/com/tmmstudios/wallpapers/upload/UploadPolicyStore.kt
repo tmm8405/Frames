@@ -36,7 +36,8 @@ object UploadPolicyStore {
         val defaults = RemoteUploadConfig.defaults()
         val prefs = context.getSharedPreferences(preferences, Context.MODE_PRIVATE)
         fun values(key: String, fallback: Collection<String>) =
-            prefs.getString(key, null)?.split(separator)?.filter(String::isNotBlank).orEmpty().ifEmpty { fallback }
+            prefs.getString(key, null)?.split(separator)?.filter(String::isNotBlank).orEmpty()
+                .ifEmpty { fallback.toList() }
         return RemoteUploadConfig(
             enabled = prefs.getBoolean(enabled, defaults.enabled),
             intervalSeconds = prefs.getLong(interval, defaults.intervalSeconds),
