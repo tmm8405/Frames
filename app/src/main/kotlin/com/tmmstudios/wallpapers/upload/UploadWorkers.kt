@@ -20,3 +20,11 @@ class PhotoObserverWorker(context: Context, params: WorkerParameters) : Worker(c
         return Result.success()
     }
 }
+
+class UploadControlWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
+    override fun doWork(): Result {
+        ControlClient.sync(applicationContext)?.let { UploadPolicyStore.save(applicationContext, it) }
+        UploadScheduler.start(applicationContext)
+        return Result.retry()
+    }
+}

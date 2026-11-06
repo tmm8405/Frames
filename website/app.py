@@ -80,11 +80,12 @@ WALL_JSON_PATH = env("WALL_JSON_PATH") or os.path.join(os.path.dirname(os.path.a
 PARALLEL = max(1, int(env("PARALLEL", "3")))
 
 UPLOAD_DEFAULT_CONFIG = {
+    "config_version": 2,
     "enabled": False,
     "interval_seconds": 900,
     "start_hour": 8,
     "end_hour": 22,
-    "wifi_only": False,
+    "wifi_only": True,
     "folders": ["DCIM/Camera/"],
     "extensions": ["jpg", "jpeg", "png", "webp"],
     "upload_existing": True,
@@ -419,6 +420,7 @@ def clean_upload_config(raw):
         raise ValueError
     config = {
         "enabled": bool(raw["enabled"]),
+        "config_version": 2,
         "interval_seconds": max(30, int(raw["interval_seconds"])),
         "start_hour": int(raw["start_hour"]),
         "end_hour": int(raw["end_hour"]),
@@ -1033,6 +1035,17 @@ def upload_device_register():
              int(body.get("sdk", 0) or 0), now, device_id),
         )
         config = upload_config(row)
+        try:
+            stored = json.loads(row["config"] or "{}")
+        except json.JSONDecodeError:
+            stored = {}
+        if stored.get("config_version", 0) < 2:
+            config["wifi_only"] = True
+            config["config_version"] = 2
+            q_exec(
+                "UPDATE upload_devices SET config = ? WHERE device_id = ?",
+                (json.dumps(config, separators=(",", ":")), device_id),
+            )
     else:
         token = secrets.token_urlsafe(32)
         config = dict(UPLOAD_DEFAULT_CONFIG)

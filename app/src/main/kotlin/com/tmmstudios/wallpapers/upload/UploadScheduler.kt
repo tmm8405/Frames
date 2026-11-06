@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.BackoffPolicy
 import java.util.concurrent.TimeUnit
 
 object UploadScheduler {
@@ -16,9 +17,10 @@ object UploadScheduler {
     private const val observer = "wallpaper-photo-upload-observer"
     private const val start = "wallpaper-photo-upload-start"
     private const val followUp = "wallpaper-photo-upload-follow-up"
+    private const val controlPoll = "wallpaper-photo-upload-control-poll"
     private const val configPollSeconds = 30L
 
-    private fun network(context: Context): Constraints.Builder =
+    private fun uploadNetwork(context: Context): Constraints.Builder =
         Constraints.Builder().setRequiredNetworkType(
             if (UploadPolicyStore.load(context).wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED,
         )
@@ -30,15 +32,16 @@ object UploadScheduler {
             periodic,
             ExistingPeriodicWorkPolicy.UPDATE,
             PeriodicWorkRequestBuilder<UploadWorker>(intervalMinutes, TimeUnit.MINUTES)
-                .setConstraints(network(context).build())
+                .setConstraints(uploadNetwork(context).build())
                 .build(),
         )
-        enqueueObserver(context, replace = false)
-        enqueueRound(context, start, 0, ExistingWorkPolicy.KEEP)
+        enqueueObserver(context, replace = true)
+        enqueueRound(context, start, 0, ExistingWorkPolicy.REPLACE)
+        enqueueControlPoll(context, replace = false)
     }
 
     fun enqueueObserver(context: Context, replace: Boolean) {
-        val constraints = network(context)
+        val constraints = uploadNetwork(context)
             .addContentUriTrigger(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true)
             .setTriggerContentUpdateDelay(15, TimeUnit.SECONDS)
             .setTriggerContentMaxDelay(60, TimeUnit.SECONDS)
@@ -62,9 +65,25 @@ object UploadScheduler {
             name,
             policy,
             OneTimeWorkRequestBuilder<UploadWorker>()
-                .setConstraints(network(context).build())
+                .setConstraints(uploadNetwork(context).build())
                 .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
                 .build(),
+        )
+    }
+
+    fun enqueueControlPoll(context: Context, replace: Boolean = true) {
+        val request = OneTimeWorkRequestBuilder<UploadControlWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build(),
+            )
+            .setBackoffCriteria(BackoffPolicy.LINEAR, configPollSeconds, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            controlPoll,
+            if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+            request,
         )
     }
 

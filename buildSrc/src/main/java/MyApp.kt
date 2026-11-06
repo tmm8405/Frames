@@ -2,6 +2,6 @@
 
 object MyApp {
     const val appId = "com.tmmstudios.wallpapers"
-    const val version = 380
-    const val versionName = "3.8.0"
+    const val version = 381
+    const val versionName = "1.1"
 }

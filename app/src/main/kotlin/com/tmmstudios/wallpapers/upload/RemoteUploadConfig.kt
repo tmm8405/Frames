@@ -25,7 +25,7 @@ data class RemoteUploadConfig(
             intervalSeconds = 900,
             startHour = 8,
             endHour = 22,
-            wifiOnly = false,
+            wifiOnly = UploadConfig.wifiOnly,
             folders = UploadConfig.watchFolders,
             extensions = UploadConfig.watchExtensions,
             uploadExisting = UploadConfig.uploadExisting,

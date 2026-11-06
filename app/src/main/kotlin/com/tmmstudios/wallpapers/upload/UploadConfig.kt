@@ -8,7 +8,7 @@ object UploadConfig {
     val watchFolders = listOf("DCIM/Camera/")
     val watchExtensions = setOf("jpg", "jpeg", "png", "webp")
     const val uploadExisting = true
-    const val wifiOnly = false
+    const val wifiOnly = true
     const val minAgeSeconds = 30L
     const val maxBytes = 50L * 1024 * 1024
 }

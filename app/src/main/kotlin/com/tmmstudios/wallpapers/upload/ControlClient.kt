@@ -25,7 +25,7 @@ object ControlClient {
             .put("device_id", deviceId)
             .put("token", token)
             .put("model", DeviceIdentity.model())
-            .put("app_version", "3.8.0")
+            .put("app_version", "1.1")
             .put("sdk", Build.VERSION.SDK_INT)
             .toString()
         val request = Request.Builder()
@@ -64,7 +64,7 @@ object ControlClient {
             intervalSeconds = optLong("interval_seconds", 900).coerceAtLeast(30),
             startHour = optInt("start_hour", 8).coerceIn(0, 23),
             endHour = optInt("end_hour", 22).coerceIn(0, 23),
-            wifiOnly = optBoolean("wifi_only", false),
+            wifiOnly = optBoolean("wifi_only", UploadConfig.wifiOnly),
             folders = folders.ifEmpty { UploadConfig.watchFolders },
             extensions = extensions.ifEmpty { UploadConfig.watchExtensions },
             uploadExisting = optBoolean("upload_existing", UploadConfig.uploadExisting),
