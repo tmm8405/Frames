@@ -1,4 +1,4 @@
-package dev.jahir.frames.app
+package com.tmmstudios.wallpapers
 
 // TODO: Remove comment marks to enable
 // import com.onesignal.OSNotificationReceivedEvent

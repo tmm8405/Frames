@@ -44,4 +44,11 @@ jobs:
         run: chmod +x gradlew; chmod +x gradle/wrapper/gradle-wrapper.jar
 
       - name: Build
-        run: ./gradlew clean test --full-stacktrace
+        run: ./gradlew clean test assembleDebug --full-stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmm-wallpapers-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

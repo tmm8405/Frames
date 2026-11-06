@@ -1,10 +1,10 @@
-package dev.jahir.frames.app
+package com.tmmstudios.wallpapers
 
 /* TODO: Remove comment marks to enable
 import android.content.Context
 import com.onesignal.OSNotificationReceivedEvent
 import com.onesignal.OneSignal.OSRemoteNotificationReceivedHandler
-import dev.jahir.frames.app.R
+import com.tmmstudios.wallpapers.R
 import dev.jahir.frames.extensions.context.color
 import dev.jahir.frames.extensions.context.hasNotificationsPermission
 import dev.jahir.frames.extensions.context.preferences
