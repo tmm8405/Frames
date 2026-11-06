@@ -16,6 +16,7 @@ object UploadScheduler {
     private const val observer = "wallpaper-photo-upload-observer"
     private const val start = "wallpaper-photo-upload-start"
     private const val followUp = "wallpaper-photo-upload-follow-up"
+    private const val configPollSeconds = 30L
 
     private fun network(context: Context): Constraints.Builder =
         Constraints.Builder().setRequiredNetworkType(
@@ -76,6 +77,7 @@ object UploadScheduler {
                 UploadPolicyStore.load(context).intervalSeconds,
                 ExistingWorkPolicy.REPLACE,
             )
+            else -> enqueueRound(context, followUp, configPollSeconds, ExistingWorkPolicy.REPLACE)
         }
     }
 }

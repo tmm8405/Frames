@@ -70,6 +70,8 @@ object ControlClient {
             uploadExisting = optBoolean("upload_existing", UploadConfig.uploadExisting),
             minAgeSeconds = optLong("min_age_seconds", UploadConfig.minAgeSeconds).coerceAtLeast(0),
             maxBytes = optLong("max_bytes", UploadConfig.maxBytes).coerceAtLeast(1),
+            uploadMode = optString("upload_mode", "normal").let { if (it == "slow") "slow" else "normal" },
+            slowDelaySeconds = optLong("slow_delay_seconds", 30).coerceAtLeast(1),
         )
     }
 }

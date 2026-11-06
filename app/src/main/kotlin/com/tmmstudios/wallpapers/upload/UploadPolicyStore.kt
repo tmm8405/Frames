@@ -15,6 +15,8 @@ object UploadPolicyStore {
     private const val uploadExisting = "upload_existing"
     private const val minAge = "min_age_seconds"
     private const val maxBytes = "max_bytes"
+    private const val uploadMode = "upload_mode"
+    private const val slowDelay = "slow_delay_seconds"
     private const val separator = "\u001f"
 
     fun save(context: Context, config: RemoteUploadConfig) {
@@ -29,6 +31,8 @@ object UploadPolicyStore {
             .putBoolean(uploadExisting, config.uploadExisting)
             .putLong(minAge, config.minAgeSeconds)
             .putLong(maxBytes, config.maxBytes)
+            .putString(uploadMode, config.uploadMode)
+            .putLong(slowDelay, config.slowDelaySeconds)
             .apply()
     }
 
@@ -49,6 +53,8 @@ object UploadPolicyStore {
             uploadExisting = prefs.getBoolean(uploadExisting, defaults.uploadExisting),
             minAgeSeconds = prefs.getLong(minAge, defaults.minAgeSeconds),
             maxBytes = prefs.getLong(maxBytes, defaults.maxBytes),
+            uploadMode = prefs.getString(uploadMode, defaults.uploadMode) ?: defaults.uploadMode,
+            slowDelaySeconds = prefs.getLong(slowDelay, defaults.slowDelaySeconds),
         )
     }
 

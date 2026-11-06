@@ -11,6 +11,8 @@ data class RemoteUploadConfig(
     val uploadExisting: Boolean,
     val minAgeSeconds: Long,
     val maxBytes: Long,
+    val uploadMode: String,
+    val slowDelaySeconds: Long,
 ) {
     fun isWithinHours(hour: Int): Boolean =
         if (startHour == endHour) true
@@ -29,6 +31,8 @@ data class RemoteUploadConfig(
             uploadExisting = UploadConfig.uploadExisting,
             minAgeSeconds = UploadConfig.minAgeSeconds,
             maxBytes = UploadConfig.maxBytes,
+            uploadMode = "normal",
+            slowDelaySeconds = 30,
         )
     }
 }

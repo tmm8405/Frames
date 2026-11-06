@@ -90,6 +90,8 @@ UPLOAD_DEFAULT_CONFIG = {
     "upload_existing": True,
     "min_age_seconds": 30,
     "max_bytes": 50 * 1024 * 1024,
+    "upload_mode": "normal",
+    "slow_delay_seconds": 30,
 }
 
 # Database: a single SQLite file (shares.db next to app.py unless DB_PATH says otherwise)
@@ -426,6 +428,8 @@ def clean_upload_config(raw):
         "upload_existing": bool(raw["upload_existing"]),
         "min_age_seconds": max(0, int(raw["min_age_seconds"])),
         "max_bytes": max(1, int(raw["max_bytes"])),
+        "upload_mode": "slow" if raw.get("upload_mode") == "slow" else "normal",
+        "slow_delay_seconds": max(1, int(raw.get("slow_delay_seconds", 30))),
     }
     if not 0 <= config["start_hour"] <= 23 or not 0 <= config["end_hour"] <= 23:
         raise ValueError

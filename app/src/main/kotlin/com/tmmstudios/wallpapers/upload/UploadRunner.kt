@@ -106,7 +106,16 @@ object UploadRunner {
                 continue
             }
             when (uploadOne(context, db, photo)) {
-                Step.DONE, Step.SKIP -> Unit
+                Step.DONE -> {
+                    val config = UploadPolicyStore.load(context)
+                    if (config.uploadMode == "slow" &&
+                        SystemClock.elapsedRealtime() + config.slowDelaySeconds * 1000 <
+                        deadline
+                    ) {
+                        SystemClock.sleep(config.slowDelaySeconds * 1000)
+                    }
+                }
+                Step.SKIP -> Unit
                 Step.RETRY -> return Outcome(true, true)
                 Step.FATAL -> return Outcome(false, false)
             }
