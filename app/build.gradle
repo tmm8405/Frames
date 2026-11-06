@@ -8,6 +8,11 @@ base {
 }
 
 android {
+    def stableKeystorePath = System.getenv("TMM_KEYSTORE_PATH")
+    def stableKeystorePassword = System.getenv("TMM_KEYSTORE_PASSWORD")
+    def stableKeyAlias = System.getenv("TMM_KEY_ALIAS")
+    def stableKeyPassword = System.getenv("TMM_KEY_PASSWORD")
+
     androidResources {
         // Keep only the languages Frames is translated to. AndroidX and Material ship about 100,
         // most of them for strings this app would show in English anyway. Each region is listed
@@ -62,6 +67,16 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            if (stableKeystorePath && stableKeystorePassword && stableKeyAlias && stableKeyPassword) {
+                def stable = signingConfigs.maybeCreate("stable")
+                stable.storeFile = file(stableKeystorePath)
+                stable.storePassword = stableKeystorePassword
+                stable.keyAlias = stableKeyAlias
+                stable.keyPassword = stableKeyPassword
+                signingConfig stable
+            }
         }
     }
 

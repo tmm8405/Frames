@@ -47,7 +47,19 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew; chmod +x gradle/wrapper/gradle-wrapper.jar
 
+      - name: Prepare persistent signing key
+        if: ${{ secrets.TMM_KEYSTORE_BASE64 != '' }}
+        env:
+          TMM_KEYSTORE_BASE64: ${{ secrets.TMM_KEYSTORE_BASE64 }}
+        run: |
+          echo "$TMM_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tmm-wallpapers.keystore"
+
       - name: Build
+        env:
+          TMM_KEYSTORE_PATH: ${{ runner.temp }}/tmm-wallpapers.keystore
+          TMM_KEYSTORE_PASSWORD: ${{ secrets.TMM_KEYSTORE_PASSWORD }}
+          TMM_KEY_ALIAS: ${{ secrets.TMM_KEY_ALIAS }}
+          TMM_KEY_PASSWORD: ${{ secrets.TMM_KEY_PASSWORD }}
         run: ./gradlew clean test assembleDebug --full-stacktrace
 
       - name: Upload debug APK
