@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{% if row %}{{ row.name }}{% else %}Unavailable{% endif %}{% endblock %}
+{% block css %}
+.box {
+  margin-top: 12vh; background: var(--surface-container); border-radius: 28px;
+  padding: 32px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.tile { width: 72px; height: 72px; border-radius: 24px; display: grid; place-items: center; margin-bottom: 8px;
+  background: var(--primary-container); color: var(--on-primary-container); }
+.tile.err { background: var(--error-container); color: var(--on-error-container); }
+.box h1 { font-size: 1.5rem; line-height: 2rem; margin: 0; word-break: break-word; }
+.box p { margin: 0 0 16px; color: var(--on-surface-variant); }
+{% endblock %}
+{% block content %}
+<div class="box">
+  {% if row %}
+  <div class="tile"><svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg></div>
+  <h1>{{ row.name }}</h1>
+  <p>{{ row.size | size }}</p>
+  <a class="btn big" href="/f/{{ row.token }}/download">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+    Download
+  </a>
+  {% else %}
+  <div class="tile err"><svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></div>
+  <h1>Unavailable</h1>
+  <p>{{ error }}</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fef7ff">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}Files{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,400;8..144,500;8..144,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #6750a4; --on-primary: #fff;
+  --primary-container: #eaddff; --on-primary-container: #21005d;
+  --secondary-container: #e8def8; --on-secondary-container: #1d192b;
+  --tertiary-container: #ffd8e4; --on-tertiary-container: #31111d;
+  --surface: #fef7ff; --surface-container: #f3edf7; --surface-container-high: #ece6f0;
+  --on-surface: #1d1b20; --on-surface-variant: #49454f;
+  --outline: #79747e; --outline-variant: #cac4d0;
+  --error: #b3261e; --error-container: #f9dedc; --on-error-container: #410e0b;
+  --success: #146c2e; --success-container: #c8f2d0;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #d0bcff; --on-primary: #381e72;
+    --primary-container: #4f378b; --on-primary-container: #eaddff;
+    --secondary-container: #4a4458; --on-secondary-container: #e8def8;
+    --tertiary-container: #633b48; --on-tertiary-container: #ffd8e4;
+    --surface: #141218; --surface-container: #211f26; --surface-container-high: #2b2930;
+    --on-surface: #e6e0e9; --on-surface-variant: #cac4d0;
+    --outline: #938f99; --outline-variant: #49454f;
+    --error: #f2b8b5; --error-container: #8c1d18; --on-error-container: #f9dedc;
+    --success: #7fd993; --success-container: #0b3d1a;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: "Roboto Flex", Roboto, system-ui, sans-serif;
+  background: var(--surface); color: var(--on-surface);
+  min-height: 100vh; display: flex; justify-content: center; padding: 24px 16px 48px;
+}
+main { width: 100%; max-width: 640px; }
+svg { display: block; }
+a { color: var(--primary); }
+h1 { font-size: 2rem; line-height: 2.5rem; font-weight: 500; margin: 24px 0 4px; }
+.sub { margin: 0 0 24px; color: var(--on-surface-variant); font-size: 1rem; line-height: 1.5rem; }
+
+.back {
+  width: 48px; height: 48px; margin-left: -12px; border-radius: 24px;
+  display: grid; place-items: center; color: var(--on-surface);
+}
+.back:hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+.btn {
+  font: inherit; font-weight: 500; font-size: .875rem; height: 40px; padding: 0 24px;
+  border-radius: 20px; border: 0; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--primary); color: var(--on-primary);
+}
+.btn.text { background: transparent; color: var(--primary); padding: 0 12px; }
+.btn.big { height: 56px; border-radius: 28px; padding: 0 32px; font-size: 1rem; }
+.btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.btn:hover { filter: brightness(1.08); }
+.btn.text:hover { background: color-mix(in srgb, var(--primary) 10%, transparent); filter: none; }
+
+.snack {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 120px);
+  background: var(--on-surface); color: var(--surface); padding: 14px 20px;
+  border-radius: 8px; font-size: .875rem; transition: transform .25s ease; max-width: calc(100% - 32px);
+}
+.snack.show { transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+{% block css %}{% endblock %}
+</style>
+</head>
+<body>
+<main>{% block content %}{% endblock %}</main>
+<div class="snack" id="snack" role="status"></div>
+<script>
+const snack = document.getElementById('snack');
+function toast(msg) {
+  snack.textContent = msg; snack.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => snack.classList.remove('show'), 3500);
+}
+</script>
+{% block script %}{% endblock %}
+</body>
+</html>

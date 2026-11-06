@@ -1,0 +1,1278 @@
+{% extends "base.html" %}
+{% block title %}Vault{% endblock %}
+{% block css %}
+body { padding: 0 0 calc(96px + env(safe-area-inset-bottom)); display: block; }
+main { max-width: none; }
+.snack { z-index: 100; }
+svg { flex: none; }
+
+.bar {
+  position: sticky; top: 0; z-index: 5; background: var(--surface);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
+}
+.bar h1 { font-size: 1.375rem; line-height: 1.75rem; margin: 0 8px 0 0; font-weight: 500; }
+.search {
+  flex: 1 1 220px; min-width: 0; max-width: 480px; display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px;
+  background: var(--surface-container-high); border-radius: 28px; color: var(--on-surface-variant);
+}
+.search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; color: var(--on-surface); }
+.spacer { flex: 1 1 0; min-width: 0; }
+.ib {
+  flex: none; width: 48px; height: 48px; border-radius: 24px; border: 0; background: transparent; color: var(--on-surface-variant);
+  display: grid; place-items: center; cursor: pointer; text-decoration: none;
+}
+.ib:hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+.ib:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.ib.on { background: var(--secondary-container); color: var(--on-secondary-container); }
+/* Phones: back, title and the two action buttons stay on the first row, search drops to its own full-width row */
+@media (max-width: 599px) {
+  .search { order: 10; flex: 1 0 100%; max-width: none; }
+}
+.count { padding: 4px calc(16px + env(safe-area-inset-left)) 12px; color: var(--on-surface-variant); font-size: .875rem; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 4px; padding: 0 calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left)); }
+@media (min-width: 700px) { .grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; } }
+.tile {
+  position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 12px; overflow: hidden; cursor: pointer;
+  background: var(--surface-container-high); transition: transform .15s, border-radius .15s; -webkit-tap-highlight-color: transparent;
+}
+.tile img { width: 100%; height: 100%; object-fit: cover; display: block; user-select: none; -webkit-user-drag: none; }
+.tile:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tile, .tile img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.tile.broken img { visibility: hidden; }
+.chk {
+  position: absolute; top: 8px; left: 8px; width: 24px; height: 24px; border-radius: 12px; display: none; place-items: center;
+  border: 2px solid #fff; background: rgba(0,0,0,.25); color: transparent;
+}
+.selecting .chk { display: grid; }
+.tile.sel { transform: scale(.88); border-radius: 20px; }
+.tile.sel .chk { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+
+.empty { display: none; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 15vh 24px; color: var(--on-surface-variant); }
+.empty .tilei { width: 72px; height: 72px; border-radius: 24px; display: grid; place-items: center; background: var(--primary-container); color: var(--on-primary-container); }
+.empty h2 { margin: 8px 0 0; color: var(--on-surface); font-weight: 500; }
+.empty p { margin: 0; max-width: 380px; line-height: 1.5; }
+
+.selbar {
+  position: fixed; left: 0; right: 0; margin: 0 auto; z-index: 20;
+  bottom: calc(12px + env(safe-area-inset-bottom)); width: calc(100% - 24px); max-width: 520px;
+  transform: translateY(calc(100% + 40px)); visibility: hidden; transition: transform .25s, visibility .25s;
+  display: flex; align-items: center; gap: 2px; padding: 6px 6px 6px 18px; border-radius: 28px;
+  background: var(--surface-container-high); box-shadow: 0 4px 16px rgba(0,0,0,.25);
+}
+.selecting .selbar { transform: none; visibility: visible; }
+.selbar b { flex: 1 1 auto; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.selbar .btn { flex: none; padding: 0 14px; }
+.selbar .ib { width: 40px; height: 40px; }
+@media (max-width: 340px) { .selbar .lbl { display: none; } .selbar { padding-left: 16px; } }
+.selecting .snack:not(.show) { transform: translate(-50%, 260px); }
+.selecting .snack { bottom: calc(84px + env(safe-area-inset-bottom)); }
+.btn.danger { background: var(--error); color: var(--surface); }
+
+dialog {
+  border: 0; border-radius: 28px; padding: 24px; width: min(360px, calc(100% - 32px));
+  background: var(--surface-container-high); color: var(--on-surface);
+}
+dialog::backdrop { background: rgba(0,0,0,.5); }
+dialog h2 { margin: 0 0 12px; font-size: 1.5rem; font-weight: 400; }
+dialog p { margin: 0 0 24px; color: var(--on-surface-variant); line-height: 1.5; }
+dialog .row { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ---- image viewer ---- */
+.lb { position: fixed; inset: 0; z-index: 50; background: #000; color: #fff; user-select: none; -webkit-user-select: none; overscroll-behavior: contain; }
+.lb[hidden] { display: none; }
+.lb .ib { color: #fff; }
+.lb .ib:hover { background: rgba(255,255,255,.14); }
+.lb-top, .lb .nav, .lb-count { transition: opacity .2s; }
+.lb.bare .lb-top, .lb.bare .nav, .lb.bare .lb-count { opacity: 0; pointer-events: none; }
+.lb-top {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 4px;
+  padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 28px calc(8px + env(safe-area-inset-left));
+  background: linear-gradient(rgba(0,0,0,.7), transparent);
+}
+.lb-title { flex: 1; min-width: 0; padding: 0 8px; }
+.lb-title div:first-child { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-title div:last-child { font-size: .75rem; opacity: .7; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The picture always fills the screen box and is letterboxed (black bars) by object-fit, so the preview
+   and the full-size file occupy exactly the same area and swapping them never makes the layout jump. */
+.stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; }
+.stage:active { cursor: grabbing; }
+.stage img {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; max-width: none;
+  object-fit: contain; display: block; transform-origin: 50% 50%; pointer-events: none; -webkit-user-drag: none;
+}
+.stage img.anim { transition: transform .24s cubic-bezier(.2,.8,.2,1), opacity .18s ease; }
+.nav { position: absolute; top: 50%; z-index: 3; margin-top: -28px; width: 56px; height: 56px; border-radius: 28px; background: rgba(0,0,0,.4); }
+.nav.prev { left: calc(12px + env(safe-area-inset-left)); } .nav.next { right: calc(12px + env(safe-area-inset-right)); }
+.nav[hidden] { display: none; }
+@media (hover: none) { .nav { display: none; } }
+.lb-count {
+  position: absolute; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 3;
+  font-size: .8125rem; background: rgba(0,0,0,.55); padding: 4px 12px; border-radius: 12px; white-space: nowrap;
+}
+.spin {
+  position: absolute; right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); width: 22px; height: 22px; z-index: 3;
+  border-radius: 50%; border: 3px solid rgba(255,255,255,.25); border-top-color: #fff; animation: spin .8s linear infinite; pointer-events: none;
+}
+.spin[hidden] { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- captions, folders, bottom navigation ---- */
+.grid[hidden], .folders[hidden], .ib[hidden], .lb-cap[hidden], #sentinel[hidden] { display: none; }
+.ib:disabled { opacity: .4; cursor: default; pointer-events: none; }
+.bar h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snack { bottom: calc(88px + env(safe-area-inset-bottom)); }
+.snack:not(.show) { transform: translate(-50%, 260px); }
+
+.tcap {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 20px 8px 6px; text-align: left; pointer-events: none;
+  font-size: .75rem; line-height: 1.2; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: linear-gradient(transparent, rgba(0,0,0,.7));
+}
+.tile.sel .tcap { opacity: 0; }
+
+.lb-cap {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; pointer-events: none; text-align: center; overflow: hidden;
+  padding: 48px calc(20px + env(safe-area-inset-right)) calc(56px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+  max-height: 45%; font-size: 1rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: linear-gradient(transparent, rgba(0,0,0,.78)); transition: opacity .2s;
+}
+.lb.bare .lb-cap { opacity: 0; }
+
+.bnav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; display: flex; justify-content: center;
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--surface-container); transition: transform .25s;
+}
+.bnav-in { display: flex; width: 100%; max-width: 480px; }
+.bn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent;
+  font: inherit; font-size: .75rem; font-weight: 500; color: var(--on-surface-variant); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.bn .pill { width: 64px; height: 32px; border-radius: 16px; display: grid; place-items: center; transition: background .2s; }
+.bn:hover .pill { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+.bn.on { color: var(--on-surface); }
+.bn.on .pill { background: var(--secondary-container); color: var(--on-secondary-container); }
+.bn:focus-visible .pill { outline: 2px solid var(--primary); }
+.selecting .bnav { transform: translateY(110%); }
+
+.folders {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px 12px;
+  padding: 4px calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
+}
+.fcard { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fcover {
+  aspect-ratio: 1; border-radius: 20px; overflow: hidden; display: grid; place-items: center;
+  background: var(--surface-container-high); color: var(--on-surface-variant); transition: transform .15s;
+}
+.fcard:hover .fcover { transform: translateY(-2px); }
+.fcard:focus-visible .fcover { outline: 2px solid var(--primary); outline-offset: 2px; }
+.fcover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fnew .fcover { background: var(--primary-container); color: var(--on-primary-container); }
+.fname { padding: 0 4px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fnum { padding: 0 4px; margin-top: -6px; font-size: .8125rem; color: var(--on-surface-variant); }
+
+dialog .field {
+  display: block; width: 100%; margin: 0 0 24px; padding: 12px 14px; font: inherit; color: var(--on-surface); resize: vertical;
+  background: var(--surface-container); border: 1px solid var(--outline); border-radius: 12px; outline: 0;
+}
+dialog .field:focus { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+dialog .field[hidden] { display: none; }
+.fpick { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow: auto; margin: 0 -8px 16px; }
+.fpick button {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; border: 0; border-radius: 16px; background: transparent;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.fpick button:hover, .fpick button:focus-visible { background: color-mix(in srgb, var(--on-surface) 8%, transparent); outline: 0; }
+.fpick .th { flex: none; width: 48px; height: 48px; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: var(--surface-container); color: var(--on-surface-variant); }
+.fpick .th img { width: 100%; height: 100%; object-fit: cover; }
+.fpick .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fpick small { display: block; color: var(--on-surface-variant); }
+.fpick .plus .th { background: var(--primary-container); color: var(--on-primary-container); }
+.fbadge { position: absolute; top: 6px; left: 6px; color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)); pointer-events: none; display: flex; }
+.tyear { position: absolute; top: 6px; right: 6px; padding: 2px 8px; border-radius: 10px; font-size: .75rem; color: #fff; background: rgba(0,0,0,.6); pointer-events: none; }
+.tile.sel .fbadge, .tile.sel .tyear, .tile.sel .ibadge { opacity: 0; }
+.ibadge { position: absolute; bottom: 6px; right: 6px; color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)); pointer-events: none; display: flex; }
+.bn { min-width: 0; }
+.bn .pill { width: 56px; }
+.lb-act { position: absolute; left: 50%; transform: translateX(-50%); z-index: 4; display: flex; gap: 4px; padding: 2px 8px; border-radius: 28px;
+  bottom: calc(52px + env(safe-area-inset-bottom)); background: rgba(0,0,0,.55); transition: opacity .2s; }
+.lb.bare .lb-act { opacity: 0; pointer-events: none; }
+.lb-cap { padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important; }
+#lbFav.on { color: #ff5c7a; }
+.fpick button.cur { background: var(--secondary-container); color: var(--on-secondary-container); }
+.fpick .sep { height: 1px; margin: 6px 8px; background: var(--outline); opacity: .4; flex: none; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; max-height: 75%; overflow: auto; padding: 8px 24px calc(24px + env(safe-area-inset-bottom));
+  background: var(--surface-container); color: var(--on-surface); border-radius: 28px 28px 0 0; transition: transform .25s; }
+.sheet[hidden] { display: none; }
+.sheet .grab { width: 32px; height: 4px; border-radius: 2px; background: var(--on-surface-variant); opacity: .4; margin: 4px auto 12px; }
+.sheet h3 { margin: 0 0 12px; font-size: 1.25rem; font-weight: 400; }
+.sheet dl { margin: 0; display: grid; grid-template-columns: 112px 1fr; gap: 10px 12px; font-size: .9375rem; }
+.sheet dt { color: var(--on-surface-variant); }
+.sheet dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.sheet .vs { margin-top: 18px; padding: 14px 16px; border-radius: 20px; background: var(--surface-container-high); font-size: .875rem; line-height: 1.5; color: var(--on-surface-variant); }
+.sheet .vs b { color: var(--on-surface); font-weight: 500; }
+
+.upload-panel { width: min(520px, calc(100% - 32px)); max-height: min(720px, calc(100vh - 48px)); overflow: auto; }
+.upload-panel h2 { margin-bottom: 8px; }
+.upload-panel .hint { margin: 0 0 20px; color: var(--on-surface-variant); line-height: 1.45; }
+.upload-panel .field-label { display: block; margin: 0 0 14px; color: var(--on-surface-variant); font-size: .875rem; }
+.upload-panel .field-label input,
+.upload-panel .field-label select { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; padding: 11px 12px; border: 1px solid var(--outline); border-radius: 12px; background: var(--surface-container); color: var(--on-surface); font: inherit; }
+.upload-panel .checks { display: grid; gap: 12px; margin: 8px 0 18px; }
+.upload-panel .checks label { display: flex; align-items: center; gap: 10px; color: var(--on-surface); }
+.upload-panel .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.upload-panel .status { min-height: 1.4em; margin: 4px 0 0; color: var(--on-surface-variant); }
+@media (max-width: 520px) { .upload-panel .two { grid-template-columns: 1fr; gap: 0; } }
+{% endblock %}
+
+{% block content %}
+<header class="bar">
+  <a class="ib" id="back" href="/" aria-label="Back" title="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></a>
+  <h1 id="ttl">Vault</h1>
+  <label class="search">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    <input id="q" type="search" placeholder="Search captions and names" autocomplete="off">
+  </label>
+  <span class="spacer"></span>
+  <button class="ib" id="fRename" aria-label="Rename folder" title="Rename folder" hidden>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+  </button>
+  <button class="ib" id="fDelete" aria-label="Delete folder" title="Delete folder" hidden>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+  </button>
+  <button class="ib" id="sortBtn" aria-label="Sort" title="Sort"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg></button>
+  <button class="ib" id="selToggle" aria-label="Select" title="Select">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+  </button>
+  <button class="ib" id="shuffle" aria-label="Random file" title="Random file">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+  </button>
+  <button class="ib" id="uploadConfig" aria-label="Upload configuration" title="Upload configuration">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65-2-3.46-2.49 1c-.52-.4-1.08-.73-1.69-.98L15 3h-4l-.36 2.93c-.61.25-1.17.59-1.69.98l-2.49-1-2 3.46 2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65 2 3.46 2.49-1c.52.4 1.08.73 1.69.98L11 21h4l.36-2.93c.61-.25 1.17-.59 1.69-.98l2.49 1 2-3.46-2.11-1.65zM13 15.5A3.5 3.5 0 1 1 13 8a3.5 3.5 0 0 1 0 7.5z"/></svg>
+  </button>
+  <button class="ib" id="logout" aria-label="Sign out" title="Sign out">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m17 7-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+  </button>
+</header>
+<div class="count" id="count">Loading…</div>
+
+<div class="grid" id="grid"></div>
+<div class="folders" id="folders" hidden></div>
+<div id="sentinel" style="height:1px"></div>
+
+<div class="empty" id="empty">
+  <div class="tilei"><svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>
+  <h2 id="emptyTitle">No images yet</h2>
+  <p id="emptyText">Images you upload from the Private upload page will show up here.</p>
+</div>
+
+<div class="selbar" role="toolbar" aria-label="Selection">
+  <b><span id="selN">0</span><span class="lbl"> selected</span></b>
+  <button class="ib" id="selAll" aria-label="Select all" title="Select all">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h2V3c-1.1 0-2 .9-2 2zm0 8h2v-2H3v2zm4 8h2v-2H7v2zM3 9h2V7H3v2zm10-6h-2v2h2V3zm6 0v2h2c0-1.1-.9-2-2-2zM5 21v-2H3c0 1.1.9 2 2 2zm-2-4h2v-2H3v2zM9 3H7v2h2V3zm2 18h2v-2h-2v2zm8-8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2zm0-12h2V7h-2v2zm0 8h2v-2h-2v2zm-4 4h2v-2h-2v2zm0-16h2V3h-2v2zM7 17h10V7H7v10zm2-8h6v6H9V9z"/></svg>
+  </button>
+  <button class="ib" id="selFav" aria-label="Favourite" title="Favourite / unfavourite"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"/></svg></button>
+  <button class="ib" id="selIgn" aria-label="Ignore" title="Ignore / unignore"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78 3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg></button>
+  <button class="ib" id="selAdd" aria-label="Add to folder" title="Add to folder">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z"/></svg>
+  </button>
+  <button class="ib" id="selRem" aria-label="Remove from this folder" title="Remove from this folder" hidden>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 8h-6v-2h6v2z"/></svg>
+  </button>
+  <button class="ib" id="selDel" aria-label="Delete" title="Delete" style="color:var(--error)">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+  </button>
+  <button class="ib" id="selCancel" aria-label="Cancel selection">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+  </button>
+</div>
+
+<nav class="bnav" aria-label="Sections"><div class="bnav-in">
+  <button class="bn on" id="tabPhotos"><span class="pill"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></span>Photos</button>
+  <button class="bn" id="tabFavs"><span class="pill"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"/></svg></span>Favourites</button>
+  <button class="bn" id="tabMem"><span class="pill"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg></span>Memories</button>
+  <button class="bn" id="tabFolders"><span class="pill"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></span>Folders</button>
+  <button class="bn" id="tabIgn"><span class="pill"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78 3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg></span>Ignored</button>
+</div></nav>
+
+<dialog id="dlg">
+  <form method="dialog">
+    <h2 id="dlgTitle"></h2><p id="dlgText"></p>
+    <div class="row"><button class="btn text" value="cancel">Cancel</button><button class="btn danger" value="ok" id="dlgOk">Delete</button></div>
+  </form>
+</dialog>
+
+<dialog id="pdlg">
+  <form id="pform" method="dialog">
+    <h2 id="pTitle"></h2>
+    <input class="field" id="pInput" maxlength="60" autocomplete="off">
+    <textarea class="field" id="pArea" rows="4" maxlength="500"></textarea>
+    <div class="row"><button class="btn text" type="button" id="pCancel">Cancel</button><button class="btn" type="submit" id="pOk">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="sdlg">
+  <h2>Sort by</h2>
+  <div class="fpick" id="sortOpts"></div>
+  <div class="row"><button class="btn text" id="sClose">Close</button></div>
+</dialog>
+
+<dialog id="fdlg">
+  <h2>Add to folder</h2>
+  <div class="fpick" id="fpick"></div>
+  <div class="row"><button class="btn text" id="fCancel">Cancel</button></div>
+</dialog>
+
+<dialog id="uploadDlg" class="upload-panel">
+  <h2>Upload configuration</h2>
+  <p class="hint">Choose a registered phone and control its background photo uploads. New phones are disabled by default.</p>
+  <label class="field-label">Phone
+    <select id="uploadDevice"></select>
+  </label>
+  <form id="uploadForm">
+    <div class="checks">
+      <label><input id="uploadEnabled" type="checkbox"> Enable backup on this phone</label>
+      <label><input id="uploadWifi" type="checkbox"> Upload only on Wi-Fi</label>
+      <label><input id="uploadExisting" type="checkbox"> Upload existing media</label>
+    </div>
+    <div class="two">
+      <label class="field-label">Interval (seconds)<input id="uploadInterval" type="number" min="30"></label>
+      <label class="field-label">Minimum age (seconds)<input id="uploadMinAge" type="number" min="0"></label>
+    </div>
+    <div class="two">
+      <label class="field-label">Start hour (0–23)<input id="uploadStart" type="number" min="0" max="23"></label>
+      <label class="field-label">End hour (0–23)<input id="uploadEnd" type="number" min="0" max="23"></label>
+    </div>
+    <label class="field-label">Folders, comma-separated<input id="uploadFolders" type="text"></label>
+    <label class="field-label">Extensions, comma-separated<input id="uploadExtensions" type="text"></label>
+    <label class="field-label">Maximum file size (bytes)<input id="uploadMaxBytes" type="number" min="1"></label>
+    <div class="status" id="uploadStatus" role="status"></div>
+    <div class="row"><button class="btn text" type="button" id="uploadClose">Close</button><button class="btn" type="submit">Save</button></div>
+  </form>
+</dialog>
+
+<div class="lb" id="lb" hidden>
+  <div class="stage" id="stage"><img id="lbImg" alt="" draggable="false"></div>
+  <div class="lb-top">
+    <button class="ib" id="lbClose" aria-label="Close"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    <div class="lb-title"><div id="lbName"></div><div id="lbMeta"></div></div>
+    <button class="ib" id="lbCap" aria-label="Edit caption" title="Edit caption"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+    <button class="ib" id="lbFolder" aria-label="Add to folder" title="Add to folder"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z"/></svg></button>
+    <a class="ib" id="lbDl" aria-label="Download" title="Download"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></a>
+    <button class="ib" id="lbDel" aria-label="Delete" title="Delete"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+  </div>
+  <button class="ib nav prev" id="lbPrev" aria-label="Previous"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
+  <button class="ib nav next" id="lbNext" aria-label="Next"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></button>
+  <div class="lb-act">
+    <button class="ib" id="lbFav" aria-label="Favourite" title="Favourite"></button>
+    <button class="ib" id="lbEdit" aria-label="Edit photo" title="Edit photo"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg></button>
+    <button class="ib" id="lbInfo" aria-label="Info" title="Info"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></button>
+    <button class="ib" id="lbIgn" aria-label="Ignore" title="Ignore"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78 3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg></button>
+    <button class="ib" id="lbPlay" aria-label="Slideshow" title="Slideshow"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+  </div>
+  <div class="sheet" id="sheet" hidden><div class="grab"></div><h3>Info</h3><dl id="infoDl"></dl><div class="vs" id="infoVault"></div></div>
+  <div class="lb-cap" id="lbCaption" hidden></div>
+  <div class="lb-count" id="lbCount"></div>
+  <div class="spin" id="lbSpin" hidden></div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+const $ = id => document.getElementById(id);
+const grid = $('grid'), body = document.body;
+const CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+const HEART_S = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+const HEART_O = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"/></svg>', HEART_F = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+const EYE_OFF_S = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78 3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>';
+const EYE_ON = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
+const EYE_OFF = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78 3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>';
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+function size(n) {
+  const u = ['B', 'KB', 'MB', 'GB']; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return (i ? n.toFixed(1) : n) + ' ' + u[i];
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (r.status === 401) { location.replace('/'); throw new Error('signed out'); }
+  return r;
+}
+const postJSON = (url, data) => api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+
+/* ---------- upload configuration ---------- */
+let uploadDevices = [], uploadCurrent = null;
+const uploadField = id => $(id);
+function uploadDeviceLabel(d) {
+  const model = d.model || 'Unknown phone';
+  return `${model} · ${d.device_id.slice(0, 8)}`;
+}
+function fillUploadForm(config) {
+  uploadField('uploadEnabled').checked = !!config.enabled;
+  uploadField('uploadWifi').checked = !!config.wifi_only;
+  uploadField('uploadExisting').checked = !!config.upload_existing;
+  uploadField('uploadInterval').value = config.interval_seconds;
+  uploadField('uploadMinAge').value = config.min_age_seconds;
+  uploadField('uploadStart').value = config.start_hour;
+  uploadField('uploadEnd').value = config.end_hour;
+  uploadField('uploadFolders').value = (config.folders || []).join(', ');
+  uploadField('uploadExtensions').value = (config.extensions || []).join(', ');
+  uploadField('uploadMaxBytes').value = config.max_bytes;
+}
+function renderUploadDevices() {
+  const select = uploadField('uploadDevice');
+  select.innerHTML = '';
+  uploadDevices.forEach((d, i) => {
+    const option = document.createElement('option');
+    option.value = i; option.textContent = uploadDeviceLabel(d); select.append(option);
+  });
+  if (!uploadDevices.length) {
+    const option = document.createElement('option');
+    option.textContent = 'No phones registered'; option.value = ''; select.append(option);
+  }
+  uploadCurrent = uploadDevices[select.value] || null;
+  if (uploadCurrent) fillUploadForm(uploadCurrent.config);
+}
+async function loadUploadDevices() {
+  uploadField('uploadStatus').textContent = 'Loading phones…';
+  try {
+    const d = await (await api('/vault/api/upload-devices')).json();
+    if (!d.ok) throw new Error(d.error || 'Could not load phones.');
+    uploadDevices = d.items || []; renderUploadDevices();
+    uploadField('uploadStatus').textContent = uploadDevices.length ? '' : 'Open the app once to register a phone.';
+  } catch (e) { uploadField('uploadStatus').textContent = e.message; }
+}
+uploadField('uploadDevice').addEventListener('change', () => {
+  uploadCurrent = uploadDevices[uploadField('uploadDevice').value] || null;
+  if (uploadCurrent) fillUploadForm(uploadCurrent.config);
+});
+uploadField('uploadConfig').onclick = () => { uploadField('uploadDlg').showModal(); loadUploadDevices(); };
+uploadField('uploadClose').onclick = () => uploadField('uploadDlg').close();
+uploadField('uploadForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!uploadCurrent) return;
+  const config = {
+    enabled: uploadField('uploadEnabled').checked,
+    wifi_only: uploadField('uploadWifi').checked,
+    upload_existing: uploadField('uploadExisting').checked,
+    interval_seconds: Number(uploadField('uploadInterval').value),
+    min_age_seconds: Number(uploadField('uploadMinAge').value),
+    start_hour: Number(uploadField('uploadStart').value),
+    end_hour: Number(uploadField('uploadEnd').value),
+    folders: uploadField('uploadFolders').value.split(',').map(v => v.trim()).filter(Boolean),
+    extensions: uploadField('uploadExtensions').value.split(',').map(v => v.trim().toLowerCase()).filter(Boolean),
+    max_bytes: Number(uploadField('uploadMaxBytes').value)
+  };
+  uploadField('uploadStatus').textContent = 'Saving…';
+  try {
+    const d = await (await postJSON('/vault/api/upload-devices/config', { device_id: uploadCurrent.device_id, config })).json();
+    if (!d.ok) throw new Error(d.error || 'Could not save configuration.');
+    uploadCurrent.config = d.config; fillUploadForm(d.config);
+    uploadField('uploadStatus').textContent = 'Saved.';
+  } catch (e) { uploadField('uploadStatus').textContent = e.message; }
+});
+
+/* ---------- list + search + infinite scroll ---------- */
+let items = [], total = 0, hasMore = true, loading = false, query = '', gen = 0, needsRefresh = false;
+let view = 'photos', folderId = null, folderName = '', folders = [];
+const selected = new Set();
+let sortBy = 'date', sortDir = 'desc', seed = 1 + Math.floor(Math.random() * 2e9);
+try { const sv = JSON.parse(localStorage.getItem('vault_sort') || '{}'); if (['date','name','size','random'].includes(sv.by)) sortBy = sv.by; if (sv.dir === 'asc') sortDir = 'asc'; } catch (_) {}
+
+function makeTile(it) {
+  const b = document.createElement('button');
+  b.className = 'tile'; b.dataset.id = it.id; b.title = it.caption || it.name;
+  const im = document.createElement('img');
+  im.loading = 'lazy'; im.decoding = 'async'; im.alt = it.name; im.src = `/vault/img/${it.id}/thumb`;
+  im.onerror = () => b.classList.add('broken');
+  const c = document.createElement('span'); c.className = 'chk'; c.innerHTML = CHECK;
+  b.append(im);
+  if (it.fav) { const f = document.createElement('span'); f.className = 'fbadge'; f.innerHTML = HEART_S; b.append(f); }
+  if (it.ignored && view === 'folder') { const g = document.createElement('span'); g.className = 'ibadge'; g.title = 'Ignored'; g.innerHTML = EYE_OFF_S; b.append(g); }
+  if (view === 'memories') { const y = document.createElement('span'); y.className = 'tyear'; y.textContent = new Date(it.created * 1000).getFullYear(); b.append(y); }
+  if (it.caption) { const cp = document.createElement('span'); cp.className = 'tcap'; cp.textContent = it.caption; b.append(cp); }
+  b.append(c);
+  return b;
+}
+
+function refreshInfo() {
+  $('count').textContent = total ? `${total} image${total === 1 ? '' : 's'}${query ? ' found' : ''}${view === 'folder' && !query ? ' in this folder' : ''}${view === 'memories' && !query ? ' from past years on this day' : ''}${view === 'ignored' && !query ? ' ignored' : ''}` : '';
+  const none = !items.length && !hasMore && !loading;
+  $('empty').style.display = none ? 'flex' : 'none';
+  if (query) { $('emptyTitle').textContent = 'No matches'; $('emptyText').textContent = 'Try a different search. It looks at captions and file names.'; }
+  else if (view === 'favs') { $('emptyTitle').textContent = 'No favourites yet'; $('emptyText').textContent = 'Tap the heart on a photo to keep it here.'; }
+  else if (view === 'memories') { $('emptyTitle').textContent = 'No memories today'; $('emptyText').textContent = 'Photos from earlier years on this date will appear here.'; }
+  else if (view === 'ignored') { $('emptyTitle').textContent = 'Nothing ignored'; $('emptyText').textContent = 'Ignored photos are hidden from Photos, Favourites and Memories but still show in their folders. Select a photo and tap the crossed-eye button to ignore it.'; }
+  else if (view === 'folder') { $('emptyTitle').textContent = 'This folder is empty'; $('emptyText').textContent = 'Select photos in the Photos tab and add them to this folder.'; }
+  else { $('emptyTitle').textContent = 'No images yet'; $('emptyText').textContent = 'Images you upload from the Private upload page will show up here.'; }
+  if (none && !query) $('count').textContent = '';
+}
+
+async function load(reset) {
+  if (reset) {
+    gen++; loading = false; items = []; grid.innerHTML = ''; hasMore = true; selected.clear(); updateBar();
+  }
+  if (loading || !hasMore) return;
+  loading = true;
+  const g = gen;
+  const p = new URLSearchParams({ limit: 60 });
+  if (query) p.set('q', query);
+  if (folderId) p.set('folder', folderId);
+  if (view === 'favs') p.set('mode', 'fav');
+  if (view === 'ignored') p.set('mode', 'ignored');
+  if (view === 'memories') {
+    const n = new Date(); p.set('mode', 'memories'); p.set('year', n.getFullYear());
+    p.set('md', String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'));
+    p.set('tz', -n.getTimezoneOffset() * 60);
+  }
+  p.set('sort', sortBy); p.set('dir', sortDir); p.set('seed', seed);
+  if (items.length) p.set('offset', items.length);
+  try {
+    const d = await (await api('/vault/api/files?' + p)).json();
+    if (g !== gen) return;
+    total = d.total; hasMore = d.has_more;
+    const frag = document.createDocumentFragment();
+    for (const it of d.items) { items.push(it); frag.append(makeTile(it)); }
+    grid.append(frag);
+  } catch (e) {
+    if (g === gen) { hasMore = false; toast('Could not load images.'); }
+  } finally {
+    if (g === gen) { loading = false; refreshInfo(); }
+  }
+}
+
+new IntersectionObserver(es => { if (es[0].isIntersecting) load(false); }, { rootMargin: '800px' }).observe($('sentinel'));
+
+let st;
+$('q').addEventListener('input', e => {
+  clearTimeout(st);
+  st = setTimeout(() => { query = e.target.value.trim(); view === 'folders' ? renderFolders() : load(true); }, 250);
+});
+
+/* ---------- selection ---------- */
+function syncBar() {
+  body.classList.toggle('selecting', selecting);
+  $('selToggle').classList.toggle('on', selecting);
+  $('selN').textContent = selected.size;
+  $('selDel').disabled = $('selAdd').disabled = $('selRem').disabled = $('selFav').disabled = $('selIgn').disabled = !selected.size;
+  { const ign = view === 'ignored'; $('selIgn').innerHTML = ign ? EYE_ON : EYE_OFF; $('selIgn').title = ign ? 'Unignore' : 'Ignore'; $('selIgn').setAttribute('aria-label', ign ? 'Unignore' : 'Ignore'); }
+}
+function updateBar() {
+  syncBar();
+  grid.querySelectorAll('.tile').forEach(t => t.classList.toggle('sel', selected.has(+t.dataset.id)));
+}
+let selecting = false;
+function setSelecting(on) { selecting = on; if (!on) selected.clear(); updateBar(); }
+function toggleSel(id) { selected.has(id) ? selected.delete(id) : selected.add(id); updateBar(); }
+
+function glideTip() {   // one-time hint on touch screens
+  if (!matchMedia('(pointer: coarse)').matches) return;
+  try { if (localStorage.getItem('vault_glide_tip')) return; localStorage.setItem('vault_glide_tip', '1'); } catch (_) { return; }
+  toast('Tip: hold a photo, then slide your finger over others to select them.');
+}
+$('selToggle').onclick = () => { setSelecting(!selecting); if (selecting) glideTip(); };
+$('selCancel').onclick = () => setSelecting(false);
+$('selAll').onclick = () => { items.forEach(i => selected.add(i.id)); updateBar(); };
+$('selDel').onclick = () => deleteIds([...selected]);
+$('selAdd').onclick = () => addToFolder([...selected]);
+$('selRem').onclick = () => removeFromFolder([...selected]);
+
+let lpTimer = null, lpFired = false, lpX = 0, lpY = 0;
+
+/* ---- glide select: hold a photo, then slide the finger over others. Everything between the first photo and the
+   one under the finger is selected (or deselected, if you started on a selected photo). Slide back to shrink it.
+   Near the top or bottom of the screen the page scrolls by itself, faster the closer the finger gets to the edge. ---- */
+const glide = { on: false, anchor: -1, last: -1, lo: 0, hi: 0, base: null, add: true, x: 0, y: 0, raf: 0 };
+const tileIndex = t => Array.prototype.indexOf.call(grid.children, t);
+
+function glideApply(cur) {
+  const a = glide.anchor, lo = Math.min(a, cur), hi = Math.max(a, cur);
+  for (let i = Math.min(lo, glide.lo); i <= Math.max(hi, glide.hi); i++) {   // only tiles whose state can change
+    const it = items[i], el = grid.children[i]; if (!it || !el) continue;
+    const on = i >= lo && i <= hi ? glide.add : glide.base.has(it.id);
+    if (on) selected.add(it.id); else selected.delete(it.id);
+    el.classList.toggle('sel', on);
+  }
+  glide.lo = lo; glide.hi = hi; glide.last = cur;
+  syncBar();
+}
+function glideTile() {
+  const top = document.querySelector('.bar').getBoundingClientRect().bottom;
+  const y = clamp(glide.y, top + 8, innerHeight - 90), x = clamp(glide.x, 6, innerWidth - 6);   // keep clear of the header and the bottom bar
+  for (const [ox, oy] of [[0, 0], [6, 0], [-6, 0], [0, 6], [0, -6]]) {   // the nudges cover the thin gaps between tiles
+    const el = document.elementFromPoint(x + ox, y + oy), t = el && el.closest && el.closest('.tile');
+    if (t && t.parentNode === grid) return tileIndex(t);
+  }
+  return -1;
+}
+function glideTrack() { const i = glideTile(); if (i >= 0 && i !== glide.last) glideApply(i); }
+function glideLoop() {
+  if (!glide.on) return;
+  const top = document.querySelector('.bar').getBoundingClientRect().bottom + 56, bottom = innerHeight - 150;
+  let v = 0;
+  if (glide.y < top) v = -Math.min(1, (top - glide.y) / 70) * 26;
+  else if (glide.y > bottom) v = Math.min(1, (glide.y - bottom) / 70) * 26;
+  if (v) { const before = window.scrollY; window.scrollBy(0, v); if (window.scrollY !== before) glideTrack(); }
+  glide.raf = requestAnimationFrame(glideLoop);
+}
+function glideStart(idx, add) {
+  glide.on = true; glide.anchor = glide.last = glide.lo = glide.hi = idx; glide.add = add;
+  glide.base = new Set(selected); glide.x = lpX; glide.y = lpY;
+  selecting = true; glideApply(idx); updateBar();
+  glide.raf = requestAnimationFrame(glideLoop);
+}
+function glideEnd() {
+  if (!glide.on) return;
+  glide.on = false; cancelAnimationFrame(glide.raf); lpFired = true; updateBar();
+}
+// Once the slide has started the browser must not scroll the page by itself (the loop above does that near the edges).
+document.addEventListener('touchmove', e => { if (glide.on && e.cancelable) e.preventDefault(); }, { passive: false });
+window.addEventListener('pointermove', e => { if (glide.on) { glide.x = e.clientX; glide.y = e.clientY; glideTrack(); } });
+['pointerup', 'pointercancel'].forEach(ev => window.addEventListener(ev, glideEnd));
+
+grid.addEventListener('pointerdown', e => {
+  const t = e.target.closest('.tile'); if (!t) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  lpFired = false; lpX = e.clientX; lpY = e.clientY;
+  clearTimeout(lpTimer);
+  // Outside selection mode a long press (0.45 s) starts it; inside it a shorter hold (0.22 s) starts a slide,
+  // while a quick swipe still just scrolls and a quick tap still toggles the photo.
+  lpTimer = setTimeout(() => {
+    lpFired = true;
+    const id = +t.dataset.id, idx = tileIndex(t);
+    if (idx < 0) return;
+    glideStart(idx, !(selecting && selected.has(id)));
+    if (navigator.vibrate) navigator.vibrate(15);
+  }, selecting ? 220 : 450);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => grid.addEventListener(ev, () => clearTimeout(lpTimer)));
+grid.addEventListener('pointermove', e => { if (!glide.on && Math.hypot(e.clientX - lpX, e.clientY - lpY) > 10) clearTimeout(lpTimer); });
+grid.addEventListener('contextmenu', e => { if (e.target.closest('.tile')) e.preventDefault(); });
+grid.addEventListener('click', e => {
+  const t = e.target.closest('.tile'); if (!t) return;
+  if (lpFired) { lpFired = false; return; }
+  const id = +t.dataset.id;
+  if (selecting) toggleSel(id);
+  else openLb(items.findIndex(i => i.id === id));
+});
+
+/* ---------- delete ---------- */
+function confirmDialog(title, text, okLabel) {
+  return new Promise(res => {
+    const d = $('dlg'); $('dlgTitle').textContent = title; $('dlgText').textContent = text; $('dlgOk').textContent = okLabel || 'Delete';
+    d.returnValue = ''; d.onclose = () => res(d.returnValue === 'ok'); d.showModal();
+  });
+}
+
+async function deleteIds(ids) {
+  if (!ids.length) return [];
+  const n = ids.length;
+  const ok = await confirmDialog(n === 1 ? 'Delete this image?' : `Delete ${n} images?`,
+    'They will be removed from the Telegram channel too. This can\u2019t be undone.');
+  if (!ok) return [];
+  let d;
+  try { d = await (await postJSON('/vault/api/delete', { ids })).json(); }
+  catch (_) { toast('Delete failed.'); return []; }
+  const gone = new Set(d.deleted || []);
+  if (gone.size) {
+    items = items.filter(i => !gone.has(i.id));
+    grid.querySelectorAll('.tile').forEach(t => { if (gone.has(+t.dataset.id)) t.remove(); });
+    gone.forEach(id => selected.delete(id));
+    total = Math.max(0, total - gone.size);
+    if (!selected.size) setSelecting(false); else updateBar();
+    refreshInfo();
+  }
+  if (d.failed && d.failed.length) toast(`${d.failed.length} couldn\u2019t be deleted: ${d.failed[0].error}`);
+  else toast(gone.size === 1 ? 'Deleted' : `Deleted ${gone.size}`);
+  return [...gone];
+}
+
+$('logout').onclick = async () => { try { await postJSON('/vault/logout'); } catch (_) {} location.replace('/'); };
+
+/* ---------- image viewer (zoom, pan, pinch, swipe) ---------- */
+const lbEl = $('lb'), stage = $('stage'), im = $('lbImg');
+const lb = { i: -1, s: 1, x: 0, y: 0, token: 0, max: 8, open: false };
+const ZOOM_MIN = 1;
+
+function apply() { im.style.transform = `translate(${lb.x}px, ${lb.y}px) scale(${lb.s})`; }
+
+// Size of the picture as drawn at zoom 1 (black bars excluded). The preview and the full file share an aspect ratio.
+function fitted() {
+  const W = stage.clientWidth, H = stage.clientHeight;
+  const nw = im.naturalWidth || W, nh = im.naturalHeight || H;
+  const k = Math.min(W / nw, H / nh);
+  return { w: nw * k, h: nh * k, W, H };
+}
+function clampPan() {
+  const f = fitted();
+  const mx = Math.max(0, (f.w * lb.s - f.W) / 2), my = Math.max(0, (f.h * lb.s - f.H) / 2);
+  lb.x = clamp(lb.x, -mx, mx); lb.y = clamp(lb.y, -my, my);
+}
+function setAnim(on) { im.classList.toggle('anim', !!on); }
+function resetZoom(animate) { setAnim(animate); lb.s = 1; lb.x = 0; lb.y = 0; apply(); }
+function zoomAt(px, py, ns, animate) {
+  ns = clamp(ns, ZOOM_MIN, lb.max);
+  setAnim(animate);
+  const r = stage.getBoundingClientRect();
+  const ox = px - (r.left + r.width / 2), oy = py - (r.top + r.height / 2), k = ns / lb.s;
+  lb.x = ox - k * (ox - lb.x); lb.y = oy - k * (oy - lb.y); lb.s = ns;
+  clampPan(); apply();
+}
+function setFade(a) { lbEl.style.background = `rgba(0,0,0,${a})`; }
+
+function show(dir) {
+  const it = items[lb.i]; if (!it) return;
+  const my = ++lb.token;
+  lb.s = 1; lb.x = 0; lb.y = 0; lb.max = 8;
+  setFade(1); lbEl.classList.remove('bare');
+  $('lbName').textContent = it.name;
+  setCaption(it);
+  $('lbMeta').textContent = size(it.size) + ' · ' + new Date(it.created * 1000).toLocaleString();
+  $('lbCount').textContent = `${lb.i + 1} / ${total}`;
+  $('lbDl').href = `/vault/dl/${it.id}`;
+  paintFav(it); paintIgn(it); if (!$('sheet').hidden) fillInfo(it);
+  $('lbPrev').hidden = lb.i <= 0;
+  $('lbNext').hidden = lb.i >= items.length - 1 && !hasMore;
+
+  // 1) the grid thumbnail is already cached, so something appears instantly (fades/slides in)
+  setAnim(false);
+  im.style.opacity = '0';
+  im.style.transform = dir ? `translate(${dir * 70}px, 0)` : 'none';
+  im.src = `/vault/img/${it.id}/thumb`;
+  const enter = () => {
+    if (my !== lb.token) return;
+    requestAnimationFrame(() => { setAnim(true); im.style.opacity = ''; apply(); });
+  };
+  (im.decode ? im.decode() : Promise.resolve()).then(enter, enter);
+
+  // 2) the original file loads in the background; it replaces the preview only once fully decoded (no flash)
+  $('lbSpin').hidden = false;
+  const full = new Image();
+  full.decoding = 'async';
+  full.onload = () => {
+    const swap = () => {
+      if (my !== lb.token) return;
+      im.src = full.src;
+      $('lbSpin').hidden = true;
+      // allow zooming to about 2x the file's real pixels
+      const f = fitted(), dpr = window.devicePixelRatio || 1;
+      lb.max = clamp((full.naturalWidth / f.w) / dpr * 2, 4, 24);
+    };
+    (full.decode ? full.decode() : Promise.resolve()).then(swap, swap);
+  };
+  full.onerror = () => {
+    if (my !== lb.token) return;
+    $('lbSpin').hidden = true;
+    toast('Full size isn’t available (Telegram’s 20 MB bot limit). Showing the preview.');
+  };
+  full.src = `/vault/img/${it.id}/full`;
+  const nx = items[lb.i + 1]; if (nx) new Image().src = `/vault/img/${nx.id}/full`;   // warm the next one
+}
+
+function openLb(i) {
+  if (i < 0) return;
+  lb.i = i; lbEl.hidden = false; lb.open = true; body.style.overflow = 'hidden';
+  history.pushState({ lb: 1 }, '');            // the phone's Back button closes the viewer, not the vault
+  show(0);
+}
+function hideLb() {
+  if (!lb.open) return;
+  stopSlides(); $('sheet').hidden = true;
+  lb.open = false; lb.token++; lbEl.hidden = true; im.removeAttribute('src'); im.style.opacity = '';
+  body.style.overflow = '';
+  if (needsRefresh) { needsRefresh = false; if (view !== 'folders') load(true); }   // a saved edit added a new photo
+}
+function closeLb() { if (history.state && history.state.lb) history.back(); else hideLb(); }
+window.addEventListener('popstate', () => { if (typeof editorPop === 'function' && editorPop()) return; hideLb(); });
+
+async function nav(d, animDir) {
+  const n = lb.i + d;
+  if (n >= items.length && hasMore) await load(false);
+  if (n < 0 || n >= items.length) { resetZoom(true); im.style.opacity = ''; return false; }
+  lb.i = n; show(animDir === undefined ? d : animDir);
+  return true;
+}
+// swipe: slide the current picture away, then bring the next one in
+async function slide(d) {
+  const n = lb.i + d;
+  if (n < 0 || (n >= items.length && !hasMore)) { resetZoom(true); return; }
+  setAnim(true); im.style.opacity = '0';
+  im.style.transform = `translate(${-d * Math.min(innerWidth * 0.5, 320)}px, 0)`;
+  const my = lb.token;
+  await new Promise(r => setTimeout(r, 150));
+  if (my === lb.token) nav(d);
+}
+
+$('lbClose').onclick = closeLb;
+$('lbPrev').onclick = () => nav(-1);
+$('lbNext').onclick = () => nav(1);
+$('lbDel').onclick = async () => {
+  const it = items[lb.i]; if (!it) return;
+  const idx = lb.i;
+  const gone = await deleteIds([it.id]);
+  if (!gone.length) return;
+  if (!items.length) { closeLb(); return; }
+  lb.i = Math.min(idx, items.length - 1); show(0);
+};
+
+document.addEventListener('keydown', e => {
+  if (lbEl.hidden || document.querySelector('dialog[open]') || (typeof ed !== 'undefined' && ed.open)) return;
+  const r = stage.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  if (e.key === 'Escape') closeLb();
+  else if (e.key === 'ArrowLeft') nav(-1);
+  else if (e.key === 'ArrowRight') nav(1);
+  else if (e.key === '+' || e.key === '=') zoomAt(cx, cy, lb.s * 1.5, true);
+  else if (e.key === '-') zoomAt(cx, cy, lb.s / 1.5, true);
+  else if (e.key === '0') resetZoom(true);
+});
+window.addEventListener('resize', () => { if (lb.open) { clampPan(); apply(); } });
+
+stage.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoomAt(e.clientX, e.clientY, lb.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018)), false);
+}, { passive: false });
+
+const ptrs = new Map();
+let dragStart = null, moved = 0, axis = null, dx = 0, dy = 0;
+let pinchD = 0, pinchS = 1, pinchMid = null, tapT = 0, tapX = 0, tapY = 0, tapTimer = 0;
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+stage.addEventListener('pointerdown', e => {
+  stage.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  setAnim(false);
+  if (ptrs.size === 1) { dragStart = { x: e.clientX, y: e.clientY, tx: lb.x, ty: lb.y }; moved = 0; axis = null; dx = dy = 0; }
+  else if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    pinchD = dist(a, b) || 1; pinchS = lb.s; pinchMid = mid(a, b); dragStart = null; moved = 99;
+  }
+});
+
+stage.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 2) {                       // pinch: zoom around the fingers and follow them while they move
+    const [a, b] = [...ptrs.values()], m = mid(a, b);
+    lb.x += m.x - pinchMid.x; lb.y += m.y - pinchMid.y; pinchMid = m;
+    zoomAt(m.x, m.y, pinchS * dist(a, b) / pinchD, false);
+    return;
+  }
+  if (!dragStart) return;
+  dx = e.clientX - dragStart.x; dy = e.clientY - dragStart.y;
+  moved = Math.max(moved, Math.hypot(dx, dy));
+  if (lb.s > 1.001) { lb.x = dragStart.tx + dx; lb.y = dragStart.ty + dy; clampPan(); apply(); return; }
+  if (!axis && moved > 10) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+  if (axis === 'x') im.style.transform = `translate(${dx}px, 0)`;
+  else if (axis === 'y') {
+    const y = dy > 0 ? dy : dy * 0.25;         // pulling down closes, pulling up just resists
+    im.style.transform = `translate(${dx * 0.3}px, ${y}px) scale(${1 - Math.min(Math.max(y, 0) / 1200, 0.25)})`;
+    setFade(1 - Math.min(Math.max(y, 0) / 400, 0.75));
+    lbEl.classList.add('bare');
+  }
+});
+
+function endPointer(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  const wasPinch = ptrs.size === 2;
+  ptrs.delete(e.pointerId);
+  if (wasPinch) {
+    const r = [...ptrs.values()][0];
+    dragStart = r ? { x: r.x, y: r.y, tx: lb.x, ty: lb.y } : null;
+    moved = 99;
+    if (lb.s < 1.05) resetZoom(true);
+    return;
+  }
+  const up = e.type === 'pointerup';
+  if (up && moved < 8) {                       // tap: double-tap toggles zoom, single tap shows/hides the controls
+    const now = Date.now();
+    if (now - tapT < 300 && Math.hypot(e.clientX - tapX, e.clientY - tapY) < 30) {
+      clearTimeout(tapTimer); tapT = 0;
+      lb.s > 1.001 ? resetZoom(true) : zoomAt(e.clientX, e.clientY, Math.min(3, lb.max), true);
+    } else {
+      tapT = now; tapX = e.clientX; tapY = e.clientY;
+      clearTimeout(tapTimer); tapTimer = setTimeout(() => lbEl.classList.toggle('bare'), 300);
+    }
+  } else if (up && lb.s <= 1.001) {            // swipe
+    if (axis === 'x' && Math.abs(dx) > 70) slide(dx < 0 ? 1 : -1);
+    else if (axis === 'y' && dy > 110) { setFade(1); closeLb(); }
+    else { setFade(1); lbEl.classList.remove('bare'); resetZoom(true); }
+  } else if (lb.s <= 1.001) { setFade(1); resetZoom(true); }
+  dragStart = null; axis = null;
+}
+stage.addEventListener('pointerup', endPointer);
+stage.addEventListener('pointercancel', endPointer);
+
+/* ---------- dialogs ---------- */
+function promptDialog({ title, value = '', multiline = false, okLabel = 'Save', placeholder = '' }) {
+  return new Promise(res => {
+    const d = $('pdlg'), inp = $('pInput'), area = $('pArea'), f = multiline ? area : inp;
+    $('pTitle').textContent = title; $('pOk').textContent = okLabel;
+    inp.hidden = multiline; area.hidden = !multiline;
+    f.value = value; f.placeholder = placeholder;
+    d.returnValue = '';
+    $('pform').onsubmit = e => { e.preventDefault(); d.close('ok'); };
+    $('pCancel').onclick = () => d.close('cancel');
+    d.onclose = () => res(d.returnValue === 'ok' ? f.value.trim() : null);
+    d.showModal(); f.focus(); f.select();
+  });
+}
+
+async function fetchFolders() {
+  try { const d = await (await api('/vault/api/folders')).json(); if (d.ok) folders = d.items; } catch (_) {}
+  return folders;
+}
+
+async function createFolderFlow() {
+  const name = await promptDialog({ title: 'New folder', placeholder: 'Folder name', okLabel: 'Create' });
+  if (!name) return null;
+  let d;
+  try { d = await (await postJSON('/vault/api/folders', { name })).json(); } catch (_) { toast('Could not create the folder.'); return null; }
+  if (!d.ok) { toast(d.error || 'Could not create the folder.'); return null; }
+  return d.folder;
+}
+
+// Shows the folder list; resolves with a folder {id, name} or null. "New folder" creates one first.
+function pickFolder() {
+  return new Promise(async res => {
+    await fetchFolders();
+    const d = $('fdlg'), list = $('fpick'); list.innerHTML = '';
+    let picked = null;
+    const row = (cls, thumb, name, sub, fn) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = cls;
+      const th = document.createElement('span'); th.className = 'th';
+      if (typeof thumb === 'string') th.innerHTML = thumb;
+      else if (thumb) { const i = document.createElement('img'); i.src = `/vault/img/${thumb}/thumb`; i.alt = ''; th.append(i); }
+      else th.innerHTML = FOLDER_SVG;
+      const nm = document.createElement('span'); nm.className = 'nm';
+      nm.textContent = name;
+      if (sub) { const sm = document.createElement('small'); sm.textContent = sub; nm.append(sm); }
+      b.append(th, nm); b.onclick = () => { picked = fn; d.close(); };
+      list.append(b);
+    };
+    row('plus', PLUS_SVG, 'New folder', '', 'new');
+    for (const f of folders) if (f.id !== folderId) row('', f.cover, f.name, `${f.n} image${f.n === 1 ? '' : 's'}`, f);
+    d.onclose = () => { if (picked === 'new') createFolderFlow().then(res); else res(picked); };
+    $('fCancel').onclick = () => d.close();
+    d.showModal();
+  });
+}
+
+/* ---------- folders ---------- */
+const FOLDER_SVG = '<svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>';
+const PLUS_SVG = '<svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z"/></svg>';
+
+function folderCard(cls, cover, name, sub, onclick) {
+  const b = document.createElement('button'); b.className = 'fcard ' + cls; b.onclick = onclick;
+  const cv = document.createElement('div'); cv.className = 'fcover';
+  if (typeof cover === 'string') cv.innerHTML = cover;
+  else if (cover) { const i = document.createElement('img'); i.loading = 'lazy'; i.alt = ''; i.src = `/vault/img/${cover}/thumb`; i.onerror = () => { i.remove(); cv.innerHTML = FOLDER_SVG; }; cv.append(i); }
+  else cv.innerHTML = FOLDER_SVG;
+  const nm = document.createElement('div'); nm.className = 'fname'; nm.textContent = name;
+  b.append(cv, nm);
+  if (sub) { const n = document.createElement('div'); n.className = 'fnum'; n.textContent = sub; b.append(n); }
+  return b;
+}
+
+function renderFolders() {
+  const box = $('folders'); box.innerHTML = '';
+  box.append(folderCard('fnew', PLUS_SVG, 'New folder', '', async () => {
+    const f = await createFolderFlow();
+    if (f) { await fetchFolders(); renderFolders(); toast(`Created \u201c${f.name}\u201d`); }
+  }));
+  const needle = query.toLowerCase();
+  const list = folders.filter(f => f.name.toLowerCase().includes(needle));
+  for (const f of list) box.append(folderCard('', f.cover, f.name, `${f.n} image${f.n === 1 ? '' : 's'}`, () => setView('folder', f)));
+  $('count').textContent = query ? `${list.length} folder${list.length === 1 ? '' : 's'} found` : (folders.length ? `${folders.length} folder${folders.length === 1 ? '' : 's'}` : 'Make a folder to organise your photos.');
+}
+
+async function addToFolder(ids) {
+  if (!ids.length) return;
+  const f = await pickFolder();
+  if (!f) return;
+  let d;
+  try { d = await (await postJSON('/vault/api/folders/add', { folder_id: f.id, ids })).json(); } catch (_) { toast('Could not add to the folder.'); return; }
+  if (!d.ok) { toast(d.error || 'Could not add to the folder.'); return; }
+  toast(d.added ? `Added ${d.added} to \u201c${f.name}\u201d` : `Already in \u201c${f.name}\u201d`);
+  if (selecting) setSelecting(false);
+}
+
+async function removeFromFolder(ids) {
+  if (!ids.length || !folderId) return;
+  let d;
+  try { d = await (await postJSON('/vault/api/folders/remove', { folder_id: folderId, ids })).json(); } catch (_) { toast('Could not remove.'); return; }
+  if (!d.ok) { toast(d.error || 'Could not remove.'); return; }
+  const gone = new Set(d.removed || []);
+  items = items.filter(i => !gone.has(i.id));
+  grid.querySelectorAll('.tile').forEach(t => { if (gone.has(+t.dataset.id)) t.remove(); });
+  total = Math.max(0, total - gone.size);
+  setSelecting(false); refreshInfo();
+  toast(gone.size === 1 ? 'Removed from folder' : `Removed ${gone.size} from folder`);
+}
+
+$('fRename').onclick = async () => {
+  const name = await promptDialog({ title: 'Rename folder', value: folderName, okLabel: 'Rename' });
+  if (!name || name === folderName) return;
+  let d;
+  try { d = await (await postJSON('/vault/api/folders/rename', { id: folderId, name })).json(); } catch (_) { toast('Could not rename.'); return; }
+  if (!d.ok) { toast(d.error || 'Could not rename.'); return; }
+  folderName = d.name; $('ttl').textContent = d.name; toast('Renamed');
+};
+$('fDelete').onclick = async () => {
+  const ok = await confirmDialog('Delete this folder?', 'Your photos stay in the vault. Only the folder is removed.', 'Delete folder');
+  if (!ok) return;
+  let d;
+  try { d = await (await postJSON('/vault/api/folders/delete', { id: folderId })).json(); } catch (_) { toast('Could not delete the folder.'); return; }
+  if (!d.ok) { toast(d.error || 'Could not delete the folder.'); return; }
+  toast('Folder deleted'); setView('folders');
+};
+
+/* ---------- captions ---------- */
+function setCaption(it) {
+  const c = $('lbCaption'); c.textContent = it.caption || ''; c.hidden = !it.caption;
+}
+function updateTile(it) {
+  const old = grid.querySelector(`.tile[data-id="${it.id}"]`);
+  if (old) { old.replaceWith(makeTile(it)); updateBar(); }
+}
+$('lbCap').onclick = async () => {
+  const it = items[lb.i]; if (!it) return;
+  const text = await promptDialog({ title: 'Caption', value: it.caption || '', multiline: true, placeholder: 'Write something about this photo' });
+  if (text === null) return;
+  let d;
+  try { d = await (await postJSON('/vault/api/caption', { id: it.id, caption: text })).json(); } catch (_) { toast('Could not save the caption.'); return; }
+  if (!d.ok) { toast(d.error || 'Could not save the caption.'); return; }
+  it.caption = d.caption; setCaption(it); updateTile(it);
+  toast(d.caption ? 'Caption saved' : 'Caption removed');
+};
+$('lbFolder').onclick = () => { const it = items[lb.i]; if (it) addToFolder([it.id]); };
+
+/* ---------- ignore ---------- */
+// Photos / Favourites / Memories hide ignored images; the Ignored tab shows only them; folders show both.
+async function setIgnored(ids, val) {
+  let d;
+  try { d = await (await postJSON('/vault/api/ignore', { ids, ignored: val })).json(); } catch (_) { toast('Could not update.'); return false; }
+  if (!d.ok) { toast(d.error || 'Could not update.'); return false; }
+  const leaves = view !== 'folder';            // in a folder the photo stays where it is
+  const set = new Set(ids);
+  if (leaves) {
+    items = items.filter(i => !set.has(i.id));
+    grid.querySelectorAll('.tile').forEach(t => { if (set.has(+t.dataset.id)) t.remove(); });
+    total = Math.max(0, total - set.size);
+  } else {
+    for (const id of ids) {
+      const it = items.find(i => i.id === id); if (!it) continue;
+      it.ignored = val; const old = grid.querySelector(`.tile[data-id="${id}"]`);
+      if (old) old.replaceWith(makeTile(it));
+    }
+  }
+  refreshInfo(); updateBar();
+  return leaves ? 'removed' : true;
+}
+function ignoreToast(n, val) { toast(val ? (n === 1 ? 'Photo ignored' : `${n} photos ignored`) : (n === 1 ? 'Photo restored' : `${n} photos restored`)); }
+$('selIgn').onclick = async () => {
+  const ids = [...selected]; if (!ids.length) return;
+  const val = view === 'ignored' ? 0 : (view === 'folder' && ids.every(id => (items.find(i => i.id === id) || {}).ignored) ? 0 : 1);
+  if (await setIgnored(ids, val)) { ignoreToast(ids.length, val); setSelecting(false); }
+};
+function paintIgn(it) {
+  const b = $('lbIgn'), on = !!it.ignored;
+  b.innerHTML = on ? EYE_ON : EYE_OFF; b.title = on ? 'Unignore' : 'Ignore'; b.setAttribute('aria-label', b.title);
+}
+$('lbIgn').onclick = async () => {
+  const it = items[lb.i]; if (!it) return;
+  const val = (view === 'ignored' || it.ignored) ? 0 : 1, idx = lb.i;
+  const r = await setIgnored([it.id], val);
+  if (!r) return;
+  ignoreToast(1, val);
+  if (r === 'removed') {                        // it left this list: move on to the next photo
+    if (!items.length) { closeLb(); return; }
+    lb.i = Math.min(idx, items.length - 1); show(0);
+  } else { paintIgn(it); if (!$('sheet').hidden) fillInfo(it); }
+};
+
+/* ---------- favourites ---------- */
+function paintFav(it) {
+  const b = $('lbFav'); b.classList.toggle('on', !!it.fav);
+  b.innerHTML = it.fav ? HEART_F : HEART_O; b.title = it.fav ? 'Remove from favourites' : 'Add to favourites';
+}
+async function setFav(ids, val) {
+  let d;
+  try { d = await (await postJSON('/vault/api/fav', { ids, fav: val })).json(); } catch (_) { toast('Could not update favourites.'); return false; }
+  if (!d.ok) { toast(d.error || 'Could not update favourites.'); return false; }
+  for (const id of ids) {
+    const it = items.find(i => i.id === id); if (!it) continue;
+    it.fav = val; const old = grid.querySelector(`.tile[data-id="${id}"]`);
+    if (old) old.replaceWith(makeTile(it));
+  }
+  updateBar(); return true;
+}
+$('lbFav').onclick = async () => {
+  const it = items[lb.i]; if (!it) return;
+  const val = it.fav ? 0 : 1;
+  if (await setFav([it.id], val)) { paintFav(it); toast(val ? 'Added to favourites' : 'Removed from favourites'); }
+};
+$('selFav').onclick = async () => {
+  const ids = [...selected]; if (!ids.length) return;
+  const val = ids.every(id => (items.find(i => i.id === id) || {}).fav) ? 0 : 1;
+  if (await setFav(ids, val)) { toast(val ? 'Added to favourites' : 'Removed from favourites'); setSelecting(false); if (view === 'favs' && !val) load(true); }
+};
+
+/* ---------- info sheet ---------- */
+const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+async function fillInfo(it) {
+  const dl = $('infoDl');
+  dl.innerHTML = row('Name', esc(it.name)) + row('Size', size(it.size)) + row('Added', new Date(it.created * 1000).toLocaleString());
+  $('infoVault').textContent = '';
+  let d;
+  try { d = await (await api('/vault/api/info/' + it.id)).json(); } catch (_) { return; }
+  if (!d.ok || items[lb.i] !== it || $('sheet').hidden) return;
+  const im = $('lbImg'), dims = im.naturalWidth > 400 || im.naturalHeight > 400 ? `${im.naturalWidth} × ${im.naturalHeight}` : '';
+  dl.innerHTML = row('Name', esc(d.name)) + (d.caption ? row('Caption', esc(d.caption)) : '') +
+    row('Type', esc(d.mime || 'unknown')) + row('Size', size(d.size) + ` (${d.size.toLocaleString()} bytes)`) +
+    (dims ? row('Dimensions', dims) : '') + row('Added', new Date(d.created * 1000).toLocaleString()) +
+    row('Favourite', d.fav ? 'Yes' : 'No') + row('Ignored', d.ignored ? 'Yes' : 'No') + row('Folders', d.folders.length ? d.folders.map(f => esc(f.name)).join(', ') : 'None') +
+    row('Security', d.encrypted ? 'Encrypted (AES-256-GCM)' : 'Not encrypted');
+  const v = d.vault;
+  $('infoVault').innerHTML = `<b>Your vault</b><br>${v.photos} photo${v.photos === 1 ? '' : 's'} · ${size(v.bytes)} · ${v.favs} favourite${v.favs === 1 ? '' : 's'} · ${v.ignored} ignored`;
+}
+$('lbInfo').onclick = () => { const it = items[lb.i]; if (!it) return; $('sheet').hidden = false; fillInfo(it); };
+$('sheet').addEventListener('click', e => e.stopPropagation());
+$('lb').addEventListener('click', e => { if (!$('sheet').hidden && !e.target.closest('.sheet')) $('sheet').hidden = true; }, true);
+
+/* ---------- slideshow ---------- */
+let slideTimer = null;
+function stopSlides() { clearInterval(slideTimer); slideTimer = null; $('lbPlay').innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'; }
+$('lbPlay').onclick = () => {
+  if (slideTimer) { stopSlides(); return; }
+  $('lbPlay').innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'; lbEl.classList.add('bare');
+  slideTimer = setInterval(() => { if (lb.i >= items.length - 1 && !hasMore) stopSlides(); else nav(1, 1); }, 4000);
+};
+
+/* ---------- sorting ---------- */
+const SORTS = { date: 'Date added', name: 'Name', size: 'File size', random: 'Random' };
+const DIR_LABEL = { date: ['Newest first', 'Oldest first'], name: ['Z to A', 'A to Z'], size: ['Largest first', 'Smallest first'] };
+function sortSummary() { return sortBy === 'random' ? 'random order' : `${SORTS[sortBy].toLowerCase()}, ${DIR_LABEL[sortBy][sortDir === 'desc' ? 0 : 1].toLowerCase()}`; }
+function applySort() {
+  try { localStorage.setItem('vault_sort', JSON.stringify({ by: sortBy, dir: sortDir })); } catch (_) {}
+  $('sortBtn').classList.toggle('on', !(sortBy === 'date' && sortDir === 'desc'));
+  load(true);
+}
+function renderSortOpts() {
+  const box = $('sortOpts'); box.innerHTML = '';
+  const add = (label, cur, fn) => {
+    const b = document.createElement('button'); b.type = 'button'; if (cur) b.className = 'cur';
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = label; b.append(nm);
+    if (cur) { const c = document.createElement('span'); c.innerHTML = CHECK; b.append(c); }
+    b.onclick = fn; box.append(b);
+  };
+  for (const k of Object.keys(SORTS)) add(SORTS[k], sortBy === k, () => {
+    if (k === 'random') seed = 1 + Math.floor(Math.random() * 2e9);
+    else if (k !== sortBy) sortDir = k === 'name' ? 'asc' : 'desc';
+    sortBy = k; $('sdlg').close(); applySort();
+  });
+  if (sortBy === 'random') { add('Shuffle again', false, () => { seed = 1 + Math.floor(Math.random() * 2e9); $('sdlg').close(); applySort(); }); return; }
+  const sep = document.createElement('div'); sep.className = 'sep'; box.append(sep);
+  DIR_LABEL[sortBy].forEach((lbl, i) => add(lbl, sortDir === (i ? 'asc' : 'desc'), () => { sortDir = i ? 'asc' : 'desc'; $('sdlg').close(); applySort(); }));
+}
+$('sortBtn').onclick = () => { renderSortOpts(); $('sdlg').showModal(); };
+$('sClose').onclick = () => $('sdlg').close();
+$('sortBtn').classList.toggle('on', !(sortBy === 'date' && sortDir === 'desc'));
+
+/* ---------- views + bottom navigation ---------- */
+function setView(v, f) {
+  gen++; loading = false;                      // drop any list request that is still in flight
+  view = v; folderId = v === 'folder' ? f.id : null; folderName = v === 'folder' ? f.name : '';
+  query = ''; $('q').value = '';
+  if (selecting) setSelecting(false);
+  const inFolders = v === 'folders';
+  body.dataset.view = v;
+  grid.hidden = $('sentinel').hidden = inFolders;
+  $('folders').hidden = !inFolders;
+  $('tabPhotos').classList.toggle('on', v === 'photos');
+  $('tabFavs').classList.toggle('on', v === 'favs');
+  $('tabMem').classList.toggle('on', v === 'memories');
+  $('tabFolders').classList.toggle('on', v === 'folders' || v === 'folder');
+  $('tabIgn').classList.toggle('on', v === 'ignored');
+  $('ttl').textContent = ({ photos: 'Vault', favs: 'Favourites', memories: 'On this day', folders: 'Folders', ignored: 'Ignored' })[v] || f.name;
+  $('q').placeholder = inFolders ? 'Search folders' : 'Search captions and names';
+  $('fRename').hidden = $('fDelete').hidden = v !== 'folder';
+  $('logout').hidden = v === 'folder';
+  $('selToggle').hidden = $('sortBtn').hidden = inFolders;
+  $('selRem').hidden = v !== 'folder';
+  { const t = v === 'folder' ? 'Back to folders' : 'Back to home'; $('back').title = t; $('back').setAttribute('aria-label', t); }
+  window.scrollTo(0, 0);
+  if (inFolders) {
+    items = []; grid.innerHTML = ''; hasMore = false; total = 0;
+    $('empty').style.display = 'none';
+    renderFolders();                           // show what we already know, then refresh
+    fetchFolders().then(() => { if (view === 'folders') renderFolders(); });
+  } else load(true);
+}
+$('tabPhotos').onclick = () => { if (view !== 'photos') setView('photos'); };
+$('tabFavs').onclick = () => { if (view !== 'favs') setView('favs'); };
+$('tabMem').onclick = () => { if (view !== 'memories') setView('memories'); };
+$('tabFolders').onclick = () => { if (view !== 'folders') setView('folders'); };
+$('tabIgn').onclick = () => { if (view !== 'ignored') setView('ignored'); };
+$('back').addEventListener('click', e => { if (view === 'folder') { e.preventDefault(); setView('folders'); } });
+
+setView('photos');
+</script>
+{% include "_editor.html" %}
+<style>
+body.priv > *:not(script):not(style) { filter: blur(28px) !important; }
+</style>
+<script>
+/* ---------- extras: idle close, privacy blur, panic close, random file ---------- */
+(() => {
+  const IDLE_MIN = {{ idle_minutes|int }};
+  let closing = false;
+  function closeVault() {
+    if (closing) return; closing = true;
+    document.body.style.visibility = 'hidden';
+    fetch('/vault/close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', keepalive: true })
+      .catch(() => {}).finally(() => location.replace('/'));
+  }
+  if (IDLE_MIN > 0) {
+    let t; const arm = () => { clearTimeout(t); t = setTimeout(closeVault, IDLE_MIN * 60000); };
+    ['mousemove', 'keydown', 'touchstart', 'scroll', 'click', 'wheel', 'playing'].forEach(e => addEventListener(e, arm, { passive: true, capture: true }));
+    arm();
+  }
+  const hide = () => document.body.classList.add('priv'), show = () => document.body.classList.remove('priv');
+  document.addEventListener('visibilitychange', () => document.hidden ? hide() : show());
+  addEventListener('blur', hide); addEventListener('focus', show);
+  addEventListener('pagehide', hide); document.addEventListener('freeze', hide);  // also covers phones' app/tab switchers
+  // Back button closes the vault address at once; a page restored from the back/forward cache is never shown again.
+  $('back').addEventListener('click', e => {
+    if (e.defaultPrevented) return;  // Back was used to leave a folder inside the vault, so keep the vault open
+    try { fetch('/vault/close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', keepalive: true }); } catch (_) {}
+  });
+  addEventListener('pageshow', e => { if (e.persisted) location.replace('/'); else if (!document.hidden && document.hasFocus()) show(); });
+  // While you're active, tell the server so the address doesn't expire under you.
+  let lastPing = 0;
+  ['pointerdown', 'keydown', 'wheel', 'touchmove', 'click'].forEach(ev => addEventListener(ev, () => {
+    const n = Date.now(); if (n - lastPing < 30000) return; lastPing = n;
+    fetch('/vault/ping', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(r => { if (r.status === 401) location.replace('/'); }).catch(() => {});
+  }, { passive: true, capture: true }));
+  let lastEsc = 0;
+  addEventListener('keydown', e => { if (e.key === 'Escape') { const n = Date.now(); if (n - lastEsc < 500) closeVault(); lastEsc = n; } });
+  addEventListener('touchstart', e => { if (e.touches.length >= 3) closeVault(); }, { passive: true });
+  let lastShake = 0, shakes = 0;
+  addEventListener('devicemotion', e => {
+    const a = e.accelerationIncludingGravity; if (!a) return;
+    if (Math.hypot(a.x || 0, a.y || 0, a.z || 0) > 30) {
+      const n = Date.now(); shakes = n - lastShake < 700 ? shakes + 1 : 1; lastShake = n;
+      if (shakes >= 3) closeVault();
+    }
+  });
+  $('shuffle').onclick = () => {
+    if (!items.length) return toast('Nothing to pick yet');
+    openLb(Math.floor(Math.random() * items.length));
+  };
+})();
+</script>
+{% endblock %}

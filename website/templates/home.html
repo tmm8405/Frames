@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Files{% endblock %}
+{% block css %}
+.cards { display: flex; flex-direction: column; gap: 12px; }
+.card {
+  display: flex; align-items: center; gap: 16px; padding: 24px; border-radius: 28px;
+  background: var(--surface-container); color: var(--on-surface); text-decoration: none;
+  transition: background .2s, transform .2s;
+}
+.card:hover, .card:focus-visible { background: var(--surface-container-high); outline: none; transform: translateY(-2px); }
+.card:focus-visible { box-shadow: 0 0 0 2px var(--primary); }
+.tile { flex: none; width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; }
+.tile.a { background: var(--primary-container); color: var(--on-primary-container); }
+.tile.c { background: var(--secondary-container); color: var(--on-secondary-container); }
+.tile.b { background: var(--tertiary-container); color: var(--on-tertiary-container); }
+.card h2 { margin: 0 0 4px; font-size: 1.375rem; font-weight: 500; }
+.card p { margin: 0; font-size: .9375rem; line-height: 1.4; color: var(--on-surface-variant); }
+.card .go { margin-left: auto; color: var(--on-surface-variant); }
+#title { width: fit-content; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; cursor: default; }
+{% endblock %}
+{% block content %}
+<h1 id="title">Files</h1>
+<p class="sub">Choose what you want to do.</p>
+<div class="cards">
+  <a class="card" href="/private">
+    <div class="tile a"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg></div>
+    <div><h2>Private upload</h2><p>Send files to a private channel. No link is made.</p></div>
+    <svg class="go" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+  </a>
+  {% if share_enabled %}
+  <a class="card" href="/share">
+    <div class="tile b"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg></div>
+    <div><h2>Share a file</h2><p>Upload a file and get a download link anyone can open.</p></div>
+    <svg class="go" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+  </a>
+  {% endif %}
+  {% if wall_enabled %}
+  <a class="card" href="/wallpapers">
+    <div class="tile c"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>
+    <div><h2>Wallpapers</h2><p>Upload wallpapers and manage the JSON for your app.</p></div>
+    <svg class="go" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+  </a>
+  {% endif %}
+</div>
+{% endblock %}
+{% block script %}
+<script>
+// Hidden entrance: tap the title 10 times quickly
+(() => {
+  let n = 0, last = 0;
+  document.getElementById('title').addEventListener('click', () => {
+    const now = Date.now();
+    n = now - last < 800 ? n + 1 : 1;
+    last = now;
+    if (n >= 10) {
+      n = 0;
+      // Ask the server for a brand-new random vault address (background request, not in history), then go there.
+      fetch('/vault/enter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then(r => r.json()).then(d => { if (d && d.url) location.assign(d.url); }, () => {});
+    }
+  });
+})();
+</script>
+{% endblock %}

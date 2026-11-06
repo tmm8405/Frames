@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}Wallpapers{% endblock %}
+{% block css %}
+.top { display: flex; align-items: center; justify-content: space-between; }
+.box { background: var(--surface-container); border-radius: 28px; padding: 20px; margin-bottom: 16px; }
+.box h2 { margin: 0 0 12px; font-size: 1.125rem; font-weight: 500; }
+.pick { display: grid; place-items: center; min-height: 160px; border: 2px dashed var(--outline); border-radius: 20px;
+  cursor: pointer; overflow: hidden; color: var(--on-surface-variant); text-align: center; margin-bottom: 12px; position: relative; }
+.pick img { width: 100%; max-height: 280px; object-fit: cover; display: none; }
+.pick.has img { display: block; } .pick.has span { display: none; }
+.pick.has { border-style: solid; border-color: var(--outline-variant); }
+.pick input { display: none; }
+.f { position: relative; margin-bottom: 10px; }
+.f input[type=text] { width: 100%; height: 56px; padding: 22px 16px 6px; font: inherit; color: var(--on-surface);
+  background: transparent; border: 1px solid var(--outline); border-radius: 4px; outline: none; }
+.f input[type=text]:focus { border: 2px solid var(--primary); padding: 21px 15px 5px; }
+.f label { position: absolute; left: 16px; top: 8px; font-size: .75rem; color: var(--on-surface-variant); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.chip { font: inherit; font-size: .8125rem; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--outline); background: transparent; color: var(--on-surface-variant); }
+.chip.on { background: var(--secondary-container); color: var(--on-secondary-container); border-color: transparent; }
+.chip.static { cursor: default; padding: 2px 8px; font-size: .6875rem; }
+.row { display: flex; gap: 20px; flex-wrap: wrap; margin: 4px 0 14px; }
+.row label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.row input { width: 20px; height: 20px; accent-color: var(--primary); }
+.bar { height: 6px; border-radius: 3px; background: var(--surface-container-high); overflow: hidden; margin-bottom: 12px; display: none; }
+.bar i { display: block; height: 100%; width: 0; background: var(--primary); transition: width .15s; }
+.acts { display: flex; gap: 8px; }
+.url { font-family: ui-monospace, Menlo, monospace; font-size: .8125rem; word-break: break-all; background: var(--surface-container-high);
+  border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.w { background: var(--surface-container); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; }
+.w img { width: 100%; aspect-ratio: 3/4; object-fit: cover; background: var(--surface-container-high); }
+.w .i { padding: 10px 12px 4px; flex: 1; }
+.w b { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w small { color: var(--on-surface-variant); display: block; margin-bottom: 6px; }
+.w .chips { gap: 4px; margin-bottom: 4px; }
+.w .acts { padding: 0 4px 8px; }
+.w .btn.text { height: 36px; padding: 0 10px; }
+.w .del { color: var(--error); }
+.empty { text-align: center; color: var(--on-surface-variant); padding: 32px 0; }
+.btn:disabled { opacity: .5; cursor: default; }
+{% endblock %}
+{% block content %}
+<div class="top">
+  <a class="back" href="/" aria-label="Back to home"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></a>
+  <button class="btn text" id="logout">Sign out</button>
+</div>
+<h1>Wallpapers</h1>
+<p class="sub" id="count">Loading…</p>
+
+<div class="box">
+  <h2 id="formTitle">New wallpaper</h2>
+  <label class="pick" id="pick">
+    <span>Tap to choose an image<br><small>JPG, PNG or WEBP, up to 20 MB</small></span>
+    <img id="prev" alt="">
+    <input type="file" id="file" accept="image/jpeg,image/png,image/webp">
+  </label>
+  <div class="f"><input type="text" id="name" maxlength="80" placeholder=" "><label for="name">Name</label></div>
+  <div class="f"><input type="text" id="author" maxlength="60" placeholder=" "><label for="author">Author</label></div>
+  <div class="f"><input type="text" id="copy" maxlength="120" placeholder=" "><label for="copy">Copyright (optional)</label></div>
+  <div class="f"><input type="text" id="cols" maxlength="200" placeholder=" "><label for="cols">Collections (comma separated)</label></div>
+  <div class="chips" id="colChips"></div>
+  <div class="row">
+    <label><input type="checkbox" id="featured"> Featured</label>
+    <label><input type="checkbox" id="dl" checked> Allow download</label>
+  </div>
+  <div class="bar" id="bar"><i id="barI"></i></div>
+  <div class="acts">
+    <button class="btn big" id="save" style="flex:1">Upload</button>
+    <button class="btn text big" id="cancel" style="display:none">Cancel</button>
+  </div>
+</div>
+
+<div class="box">
+  <h2>JSON for your app</h2>
+  <div class="url" id="jsonUrl">…</div>
+  <div class="acts"><button class="btn text" id="copyUrl">Copy link</button><a class="btn text" id="openUrl" target="_blank" rel="noopener">Open</a></div>
+</div>
+
+<div class="grid" id="grid"></div>
+<div class="empty" id="empty" style="display:none">No wallpapers yet. Upload your first one above.</div>
+{% endblock %}
+{% block script %}
+<script>
+const $ = id => document.getElementById(id);
+let items = [], editId = null, file = null;
+
+async function api(url, data) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  let j = {}; try { j = await r.json(); } catch (_) {}
+  if (r.status === 401) { location.reload(); }
+  return j;
+}
+function h(tag, props, ...kids) {
+  const e = Object.assign(document.createElement(tag), props || {});
+  kids.forEach(k => e.append(k)); return e;
+}
+const tags = () => $('cols').value.split(',').map(s => s.trim()).filter(Boolean);
+
+function renderChips() {
+  const known = [...new Set(items.flatMap(i => (i.collections || '').split(',').map(s => s.trim()).filter(s => s && s.toLowerCase() !== 'featured')))];
+  const cur = tags().map(t => t.toLowerCase());
+  const box = $('colChips'); box.replaceChildren();
+  known.forEach(k => {
+    const c = h('button', { type: 'button', className: 'chip' + (cur.includes(k.toLowerCase()) ? ' on' : ''), textContent: k });
+    c.onclick = () => {
+      const t = tags(), i = t.findIndex(x => x.toLowerCase() === k.toLowerCase());
+      if (i >= 0) t.splice(i, 1); else t.push(k);
+      $('cols').value = t.join(', '); renderChips();
+    };
+    box.append(c);
+  });
+}
+$('cols').addEventListener('input', renderChips);
+
+function render() {
+  $('count').textContent = items.length + (items.length === 1 ? ' wallpaper' : ' wallpapers');
+  $('empty').style.display = items.length ? 'none' : 'block';
+  const g = $('grid'); g.replaceChildren();
+  items.forEach(it => {
+    const chips = h('div', { className: 'chips' });
+    if (it.featured) chips.append(h('span', { className: 'chip static on', textContent: 'featured' }));
+    (it.collections || '').split(',').map(s => s.trim()).filter(s => s && s !== 'featured')
+      .forEach(s => chips.append(h('span', { className: 'chip static', textContent: s })));
+    if (!it.downloadable) chips.append(h('span', { className: 'chip static', textContent: 'no download' }));
+    const edit = h('button', { className: 'btn text', textContent: 'Edit' }); edit.onclick = () => startEdit(it);
+    const del = h('button', { className: 'btn text del', textContent: 'Delete' });
+    del.onclick = async () => {
+      if (!confirm('Delete "' + it.name + '"? It is removed from Telegram and the JSON.')) return;
+      del.disabled = true;
+      const r = await api('/wallpapers/api/delete', { ids: [it.id] });
+      if (r.deleted && r.deleted.includes(it.id)) { items = items.filter(x => x.id !== it.id); render(); toast('Deleted'); }
+      else { del.disabled = false; toast((r.failed && r.failed[0] && r.failed[0].error) || 'Could not delete.'); }
+    };
+    g.append(h('div', { className: 'w' },
+      h('img', { src: it.thumbnail, loading: 'lazy', alt: '' }),
+      h('div', { className: 'i' }, h('b', { textContent: it.name }),
+        h('small', { textContent: (it.author || 'Unknown') + ' · ' + it.dimensions }), chips),
+      h('div', { className: 'acts' }, edit, del)));
+  });
+  renderChips();
+}
+
+async function load() {
+  const r = await (await fetch('/wallpapers/api/list')).json().catch(() => ({}));
+  if (!r.ok) { if (!r.error) toast('Could not load.'); return; }
+  items = r.items; $('jsonUrl').textContent = r.json_url; $('openUrl').href = r.json_url; render();
+}
+
+function resetForm() {
+  editId = null; file = null;
+  ['name', 'author', 'copy', 'cols'].forEach(i => $(i).value = '');
+  $('featured').checked = false; $('dl').checked = true; $('file').value = '';
+  $('pick').classList.remove('has'); $('pick').style.display = '';
+  $('formTitle').textContent = 'New wallpaper'; $('save').textContent = 'Upload'; $('cancel').style.display = 'none';
+  renderChips();
+}
+function startEdit(it) {
+  resetForm(); editId = it.id;
+  $('name').value = it.name; $('author').value = it.author; $('copy').value = it.copyright;
+  $('cols').value = (it.collections || '').split(',').map(s => s.trim()).filter(s => s && s !== 'featured').join(', ');
+  $('featured').checked = it.featured; $('dl').checked = it.downloadable;
+  $('pick').style.display = 'none'; $('formTitle').textContent = 'Edit "' + it.name + '"';
+  $('save').textContent = 'Save changes'; $('cancel').style.display = ''; renderChips();
+  scrollTo({ top: 0, behavior: 'smooth' });
+}
+$('cancel').onclick = resetForm;
+
+$('file').onchange = e => {
+  file = e.target.files[0]; if (!file) return;
+  $('prev').src = URL.createObjectURL(file); $('pick').classList.add('has');
+  if (!$('name').value) $('name').value = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+};
+
+function sendUpload(fd) {
+  return new Promise(res => {
+    const x = new XMLHttpRequest();
+    x.open('POST', '/wallpapers/api/upload'); x.setRequestHeader('X-Vault', '1');
+    x.upload.onprogress = e => { if (e.lengthComputable) {
+      $('barI').style.width = Math.round(e.loaded / e.total * 100) + '%';
+      if (e.loaded === e.total) $('save').textContent = 'Sending to Telegram…'; } };
+    x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch (_) {}
+      if (x.status === 401) { location.reload(); return; } res(j); };
+    x.onerror = () => res({ ok: false, error: 'Network error.' });
+    x.send(fd);
+  });
+}
+
+$('save').onclick = async () => {
+  const btn = $('save'), label = btn.textContent;
+  const body = { name: $('name').value, author: $('author').value, copyright: $('copy').value,
+    collections: $('cols').value, featured: $('featured').checked, downloadable: $('dl').checked };
+  btn.disabled = true;
+  let r;
+  if (editId) {
+    r = await api('/wallpapers/api/update', { id: editId, ...body });
+    if (r.ok) items = items.map(x => x.id === editId ? r.item : x);
+  } else {
+    if (!file) { toast('Choose an image first.'); btn.disabled = false; return; }
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('name', body.name); fd.append('author', body.author); fd.append('copyright', body.copyright);
+    fd.append('collections', body.collections); fd.append('featured', body.featured ? '1' : '0');
+    fd.append('downloadable', body.downloadable ? '1' : '0');
+    $('bar').style.display = 'block'; $('barI').style.width = '0';
+    r = await sendUpload(fd);
+    $('bar').style.display = 'none';
+    if (r.ok) items.unshift(r.item);
+  }
+  btn.disabled = false; btn.textContent = label;
+  if (r.ok) { toast(editId ? 'Saved' : 'Uploaded'); resetForm(); render(); }
+  else toast(r.error || 'Something went wrong.');
+};
+
+$('copyUrl').onclick = () => navigator.clipboard.writeText($('jsonUrl').textContent).then(() => toast('Link copied'), () => toast('Copy failed'));
+$('logout').onclick = async () => { await api('/wallpapers/logout', {}); location.reload(); };
+load();
+</script>
+{% endblock %}

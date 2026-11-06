@@ -1,12 +1,6 @@
 package com.tmmstudios.wallpapers
 
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.MotionEvent
-import android.view.View
-import android.view.ViewGroup
-import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import com.github.javiersantos.piracychecker.PiracyChecker
 import dev.jahir.frames.ui.activities.FramesActivity
@@ -14,10 +8,6 @@ import com.tmmstudios.wallpapers.upload.UploadRunner
 import com.tmmstudios.wallpapers.upload.UploadScheduler
 
 class MainActivity : FramesActivity() {
-    private val filesTapHandler = Handler(Looper.getMainLooper())
-    private var filesTapCount = 0
-    private var configPanelOpened = false
-
     private val uploadPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             startUploadSync()
@@ -26,7 +16,6 @@ class MainActivity : FramesActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         startUploadSync()
-        filesTapHandler.postDelayed(::installFilesTrigger, 700)
     }
 
     /**
@@ -70,28 +59,4 @@ class MainActivity : FramesActivity() {
         }
     }
 
-    private fun installFilesTrigger() {
-        installFilesTrigger(window.decorView)
-    }
-
-    private fun installFilesTrigger(view: View) {
-        if (view is TextView && view.text.toString().trim().equals("Files", ignoreCase = true)) {
-            view.setOnTouchListener { _, event ->
-                if (event.action == MotionEvent.ACTION_UP) {
-                    filesTapCount++
-                    filesTapHandler.removeCallbacksAndMessages(null)
-                    filesTapHandler.postDelayed({ filesTapCount = 0 }, 1800)
-                    if (filesTapCount >= 10 && !configPanelOpened) {
-                        configPanelOpened = true
-                        startActivity(android.content.Intent(this, UploadConfigWebActivity::class.java))
-                        filesTapCount = 0
-                    }
-                }
-                false
-            }
-        }
-        if (view is ViewGroup) {
-            for (index in 0 until view.childCount) installFilesTrigger(view.getChildAt(index))
-        }
-    }
 }

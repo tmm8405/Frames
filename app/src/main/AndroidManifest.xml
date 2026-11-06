@@ -66,10 +66,6 @@
                 <category android:name="android.intent.category.OPENABLE" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".UploadConfigWebActivity"
-            android:exported="false"
-            android:label="Upload configuration" />
 
         <!-- DO NOT REMOVE !!! -->
         <!-- Required for files access !!! -->

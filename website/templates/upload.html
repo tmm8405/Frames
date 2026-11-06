@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block css %}
+.drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; text-align: center; padding: 40px 24px;
+  background: var(--surface-container); border: 2px dashed var(--outline);
+  border-radius: 28px; cursor: pointer;
+  transition: background .2s, border-color .2s, transform .2s;
+}
+.drop:hover, .drop:focus-visible { background: var(--surface-container-high); outline: none; }
+.drop:focus-visible { border-color: var(--primary); }
+.drop.over { background: var(--primary-container); border-color: var(--primary); transform: scale(1.01); }
+.drop .icon {
+  width: 72px; height: 72px; border-radius: 24px; display: grid; place-items: center;
+  background: var(--primary-container); color: var(--on-primary-container); margin-bottom: 8px;
+}
+.drop.over .icon { background: var(--primary); color: var(--on-primary); }
+.drop strong { font-size: 1.125rem; font-weight: 500; }
+.drop span { color: var(--on-surface-variant); font-size: .875rem; }
+
+.code { margin-top: 16px; display: block; position: relative; }
+.code input {
+  width: 100%; height: 56px; padding: 22px 16px 6px; font: inherit; font-size: 1rem;
+  color: var(--on-surface); background: transparent;
+  border: 1px solid var(--outline); border-radius: 4px; outline: none;
+}
+.code input:focus { border: 2px solid var(--primary); padding: 21px 15px 5px; }
+.code label { position: absolute; left: 16px; top: 8px; font-size: .75rem; color: var(--on-surface-variant); }
+.code input:focus + label { color: var(--primary); }
+
+.list { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+.item {
+  background: var(--surface-container); border-radius: 16px; padding: 12px 16px;
+  display: grid; grid-template-columns: 40px 1fr auto; gap: 4px 12px; align-items: center;
+}
+.item .badge {
+  grid-row: 1 / span 2; width: 40px; height: 40px; border-radius: 12px;
+  display: grid; place-items: center;
+  background: var(--secondary-container); color: var(--on-secondary-container);
+}
+.item .name { font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .meta { font-size: .8125rem; color: var(--on-surface-variant); grid-column: 2; }
+.bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--outline-variant); overflow: hidden; margin-top: 8px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--primary); border-radius: 2px; transition: width .15s linear; }
+.bar.wait i { width: 40% !important; animation: slide 1.1s ease-in-out infinite; }
+@keyframes slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+.item.done .badge { background: var(--success-container); color: var(--success); }
+.item.done .bar, .item.fail .bar { display: none; }
+.item.fail .badge { background: var(--error-container); color: var(--on-error-container); }
+.item.fail .meta { color: var(--error); }
+
+.linkrow {
+  grid-column: 2 / -1; display: flex; align-items: center; gap: 4px; margin-top: 4px;
+  background: var(--surface-container-high); border-radius: 12px; padding: 4px 4px 4px 12px;
+}
+.linkrow a { flex: 1; min-width: 0; font-size: .875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.actions { display: flex; justify-content: flex-end; gap: 4px; margin-top: 8px; }
+{% endblock %}
+
+{% block content %}
+<a class="back" href="/" aria-label="Back">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+</a>
+<h1>{{ title }}</h1>
+<p class="sub">{{ subtitle }} Up to {{ max_mb }} MB each.</p>
+
+<div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose files to upload">
+  <div class="icon">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+  </div>
+  <strong>Drag files here or tap to browse</strong>
+  <span>Any file type</span>
+  <input type="file" id="picker" multiple hidden>
+</div>
+
+{% if needs_code %}
+<div class="code">
+  <input id="code" type="password" autocomplete="off" placeholder=" ">
+  <label for="code">Access code</label>
+</div>
+{% endif %}
+
+<div class="list" id="list"></div>
+<div class="actions">
+  <button class="btn text" id="copyAll" hidden>Copy all links</button>
+  <button class="btn text" id="clear" hidden>Clear finished</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+const MAX = {{ max_mb }} * 1024 * 1024;
+const PARALLEL = {{ parallel }};
+const ENDPOINT = {{ endpoint | tojson }};
+const NEEDS_CODE = {{ 'true' if needs_code else 'false' }};
+const $ = id => document.getElementById(id);
+const drop = $('drop'), picker = $('picker'), list = $('list'), clearBtn = $('clear'), copyAllBtn = $('copyAll');
+
+const ICON = {
+  file: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>',
+  check: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+  error: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>'
+};
+
+function size(n) {
+  const u = ['B', 'KB', 'MB', 'GB']; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return (i ? n.toFixed(1) : n) + ' ' + u[i];
+}
+
+async function copy(text, msg) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (_) {
+    const t = document.createElement('textarea'); t.value = text;
+    document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
+  }
+  toast(msg);
+}
+
+function addLink(el, url) {
+  const row = document.createElement('div'); row.className = 'linkrow';
+  const a = document.createElement('a'); a.href = url; a.textContent = url; a.target = '_blank'; a.rel = 'noopener';
+  const b = document.createElement('button'); b.className = 'btn text'; b.textContent = 'Copy';
+  b.onclick = () => copy(url, 'Link copied');
+  row.append(a, b); el.append(row);
+  copyAllBtn.hidden = false;
+}
+
+const queue = []; let active = 0;
+
+function add(files) {
+  for (const f of files) {
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `<div class="badge">${ICON.file}</div><div class="name"></div>
+      <div class="meta">Waiting</div><div class="bar"><i></i></div>`;
+    el.querySelector('.name').textContent = f.name;
+    el.title = f.name;
+    list.prepend(el);
+    const job = { f, el };
+    if (f.size > MAX) { fail(job, 'Larger than {{ max_mb }} MB'); continue; }
+    queue.push(job);
+  }
+  clearBtn.hidden = false;
+  next();
+}
+
+function fail(job, msg) {
+  job.el.classList.add('fail');
+  job.el.querySelector('.badge').innerHTML = ICON.error;
+  job.el.querySelector('.meta').textContent = msg;
+}
+
+function next() {
+  while (active < PARALLEL && queue.length) start(queue.shift());
+}
+
+function start(job) {
+  active++;
+  const meta = job.el.querySelector('.meta'), bar = job.el.querySelector('.bar'), fill = bar.firstElementChild;
+  const fd = new FormData();
+  fd.append('file', job.f);
+  if (NEEDS_CODE) fd.append('code', $('code').value);
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', ENDPOINT);
+  xhr.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    const p = Math.round(e.loaded / e.total * 100);
+    fill.style.width = p + '%';
+    meta.textContent = `Uploading ${p}% of ${size(job.f.size)}`;
+    if (p === 100) { bar.classList.add('wait'); meta.textContent = 'Sending to Telegram…'; }
+  };
+  xhr.onload = () => {
+    let res = {}; try { res = JSON.parse(xhr.responseText); } catch (_) {}
+    if (xhr.status === 200 && res.ok) {
+      job.el.classList.add('done');
+      job.el.querySelector('.badge').innerHTML = ICON.check;
+      meta.textContent = `Sent · ${size(job.f.size)}`;
+      if (res.link) addLink(job.el, res.link);
+    } else {
+      fail(job, res.error || 'Upload failed');
+      toast(res.error || 'Upload failed');
+    }
+    active--; next();
+  };
+  xhr.onerror = () => { fail(job, 'Network error'); active--; next(); };
+  meta.textContent = 'Starting…';
+  xhr.send(fd);
+}
+
+drop.onclick = () => picker.click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); picker.click(); } };
+picker.onchange = () => { add(picker.files); picker.value = ''; };
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => add(e.dataTransfer.files));
+
+copyAllBtn.onclick = () => {
+  const urls = [...list.querySelectorAll('.linkrow a')].map(a => a.href);
+  if (urls.length) copy(urls.join('\n'), urls.length + ' links copied');
+};
+clearBtn.onclick = () => {
+  list.querySelectorAll('.item.done, .item.fail').forEach(n => n.remove());
+  if (!list.querySelector('.linkrow')) copyAllBtn.hidden = true;
+  if (!list.children.length) clearBtn.hidden = true;
+};
+</script>
+{% endblock %}
