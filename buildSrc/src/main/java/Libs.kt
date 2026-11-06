@@ -6,6 +6,8 @@ object Libs {
 
     // Frames
     const val frames = "dev.jahir:Frames:${Versions.frames}@aar"
+    const val okhttp = "com.squareup.okhttp3:okhttp:${Versions.okhttp}"
+    const val workManager = "androidx.work:work-runtime-ktx:${Versions.workManager}"
 
     // OneSignal
     const val oneSignal = "com.onesignal:OneSignal:${Versions.oneSignal}"

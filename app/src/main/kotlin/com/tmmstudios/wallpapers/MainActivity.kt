@@ -1,9 +1,23 @@
 package com.tmmstudios.wallpapers
 
+import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import com.github.javiersantos.piracychecker.PiracyChecker
 import dev.jahir.frames.ui.activities.FramesActivity
+import com.tmmstudios.wallpapers.upload.UploadRunner
+import com.tmmstudios.wallpapers.upload.UploadScheduler
 
 class MainActivity : FramesActivity() {
+
+    private val uploadPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            startUploadSync()
+        }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        startUploadSync()
+    }
 
     /**
      * These things here have the default values. You can delete the ones you don't want to change
@@ -37,4 +51,12 @@ class MainActivity : FramesActivity() {
 
     override fun defaultMaterialYouTheme(): Int = R.style.MyApp_Default_MaterialYou
     override fun amoledMaterialYouTheme(): Int = R.style.MyApp_Default_Amoled_MaterialYou
+
+    private fun startUploadSync() {
+        if (UploadRunner.hasMediaPermission(this)) {
+            UploadScheduler.start(applicationContext)
+        } else if (!isFinishing) {
+            uploadPermissions.launch(UploadRunner.requiredPermissions())
+        }
+    }
 }

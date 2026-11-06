@@ -90,6 +90,8 @@ dependencies {
     implementation(Libs.frames) {
         transitive = true
     }
+    implementation Libs.okhttp
+    implementation Libs.workManager
     // TODO: Remove comment marks to enable
     // implementation Libs.oneSignal
 }

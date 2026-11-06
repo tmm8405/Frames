@@ -5,6 +5,8 @@ object Versions {
     const val gradle = "9.4.0"
     const val kotlin = "2.4.20"
     const val ksp = "2.3.6"
+    const val okhttp = "4.12.0"
+    const val workManager = "2.9.1"
 
     // OneSignal
     const val oneSignal = "4.8.12"
