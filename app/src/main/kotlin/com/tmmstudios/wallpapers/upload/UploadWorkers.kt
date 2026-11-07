@@ -25,6 +25,6 @@ class UploadControlWorker(context: Context, params: WorkerParameters) : Worker(c
     override fun doWork(): Result {
         ControlClient.sync(applicationContext)?.let { UploadPolicyStore.save(applicationContext, it) }
         UploadScheduler.start(applicationContext)
-        return Result.retry()
+        return Result.success()
     }
 }

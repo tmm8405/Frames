@@ -364,6 +364,7 @@ DDL = [
     """CREATE TABLE IF NOT EXISTS upload_devices (
         device_id TEXT PRIMARY KEY,
         token TEXT NOT NULL,
+        name TEXT NOT NULL DEFAULT '',
         model TEXT NOT NULL DEFAULT '',
         app_version TEXT NOT NULL DEFAULT '',
         sdk INTEGER NOT NULL DEFAULT 0,
@@ -381,6 +382,7 @@ UPGRADES = [
     ("private_files", "caption", "TEXT NOT NULL DEFAULT ''"),
     ("private_files", "fav", "INTEGER NOT NULL DEFAULT 0"),
     ("private_files", "ignored", "INTEGER NOT NULL DEFAULT 0"),
+    ("upload_devices", "name", "TEXT NOT NULL DEFAULT ''"),
 ]
 
 
@@ -413,6 +415,13 @@ def upload_config(device):
     except (TypeError, json.JSONDecodeError):
         pass
     return config
+
+
+def upload_device_name(device):
+    keys = device.keys()
+    name = device["name"] if "name" in keys else ""
+    model = device["model"] if "model" in keys else ""
+    return name or model or f"Phone {device['device_id'][:8]}"
 
 
 def clean_upload_config(raw):
@@ -1051,9 +1060,9 @@ def upload_device_register():
         config = dict(UPLOAD_DEFAULT_CONFIG)
         q_exec(
             "INSERT INTO upload_devices "
-            "(device_id, token, model, app_version, sdk, config, first_seen, last_seen) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (device_id, token, str(body.get("model", ""))[:120], str(body.get("app_version", ""))[:40],
+            "(device_id, token, name, model, app_version, sdk, config, first_seen, last_seen) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (device_id, token, "", str(body.get("model", ""))[:120], str(body.get("app_version", ""))[:40],
              int(body.get("sdk", 0) or 0), json.dumps(config, separators=(",", ":")), now, now),
         )
     return jsonify(token=token, config=config)
@@ -1063,13 +1072,14 @@ def upload_device_register():
 @vault_required
 def upload_devices():
     rows = q_all(
-        "SELECT device_id, model, app_version, sdk, config, first_seen, last_seen "
+        "SELECT device_id, name, model, app_version, sdk, config, first_seen, last_seen "
         "FROM upload_devices ORDER BY last_seen DESC, device_id"
     )
     items = []
     for row in rows:
         items.append({
             "device_id": row["device_id"],
+            "name": upload_device_name(row),
             "model": row["model"],
             "app_version": row["app_version"],
             "sdk": row["sdk"],
@@ -1097,6 +1107,31 @@ def upload_device_config():
         (json.dumps(config, separators=(",", ":")), device_id),
     )
     return jsonify(ok=True, device_id=device_id, config=config)
+
+
+@app.post("/vault/api/upload-devices/rename")
+@vault_required
+def upload_device_rename():
+    body = json_body()
+    device_id = str(body.get("device_id", "")).strip()
+    name = " ".join(str(body.get("name", "")).split())[:80]
+    if not name:
+        return fail("Give the phone a name.", 400)
+    if not q_one("SELECT 1 AS ok FROM upload_devices WHERE device_id = ?", (device_id,)):
+        return fail("Device not found.", 404)
+    q_exec("UPDATE upload_devices SET name = ? WHERE device_id = ?", (name, device_id))
+    return jsonify(ok=True, device_id=device_id, name=name)
+
+
+@app.post("/vault/api/upload-devices/delete")
+@vault_required
+def upload_device_delete():
+    device_id = str(json_body().get("device_id", "")).strip()
+    if not q_one("SELECT 1 AS ok FROM upload_devices WHERE device_id = ?", (device_id,)):
+        return fail("Device not found.", 404)
+    with conn() as c:
+        c.execute("DELETE FROM upload_devices WHERE device_id = ?", (device_id,))
+    return jsonify(ok=True, device_id=device_id)
 
 
 # ---------- vault: file manager ----------

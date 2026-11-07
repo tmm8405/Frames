@@ -223,6 +223,7 @@ dialog .field[hidden] { display: none; }
 .upload-panel .checks label { display: flex; align-items: center; gap: 10px; color: var(--on-surface); }
 .upload-panel .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .upload-panel .status { min-height: 1.4em; margin: 4px 0 0; color: var(--on-surface-variant); }
+.upload-panel .device-actions { display: flex; gap: 8px; margin: -4px 0 18px; }
 @media (max-width: 520px) { .upload-panel .two { grid-template-columns: 1fr; gap: 0; } }
 {% endblock %}
 
@@ -330,6 +331,10 @@ dialog .field[hidden] { display: none; }
   <label class="field-label">Phone
     <select id="uploadDevice"></select>
   </label>
+  <div class="device-actions">
+    <button class="btn text" type="button" id="uploadRename">Rename phone</button>
+    <button class="btn text" type="button" id="uploadDelete" style="color:var(--error)">Delete phone</button>
+  </div>
   <form id="uploadForm">
     <div class="checks">
       <label><input id="uploadEnabled" type="checkbox"> Enable backup on this phone</label>
@@ -412,8 +417,7 @@ const postJSON = (url, data) => api(url, { method: 'POST', headers: { 'Content-T
 let uploadDevices = [], uploadCurrent = null;
 const uploadField = id => $(id);
 function uploadDeviceLabel(d) {
-  const model = d.model || 'Unknown phone';
-  return `${model} · ${d.device_id.slice(0, 8)}`;
+  return `${d.name || d.model || 'Unknown phone'} · ${d.device_id.slice(0, 8)}`;
 }
 function fillUploadForm(config) {
   uploadField('uploadEnabled').checked = !!config.enabled;
@@ -458,6 +462,30 @@ uploadField('uploadDevice').addEventListener('change', () => {
 });
 uploadField('uploadConfig').onclick = () => { uploadField('uploadDlg').showModal(); loadUploadDevices(); };
 uploadField('uploadClose').onclick = () => uploadField('uploadDlg').close();
+uploadField('uploadRename').onclick = async () => {
+  if (!uploadCurrent) return;
+  const name = prompt('Name this phone', uploadCurrent.name || uploadCurrent.model || '');
+  if (name === null) return;
+  try {
+    const d = await (await postJSON('/vault/api/upload-devices/rename', { device_id: uploadCurrent.device_id, name })).json();
+    if (!d.ok) throw new Error(d.error || 'Could not rename phone.');
+    uploadCurrent.name = d.name;
+    renderUploadDevices();
+    uploadField('uploadDevice').value = uploadDevices.indexOf(uploadCurrent);
+    uploadField('uploadStatus').textContent = 'Phone renamed.';
+  } catch (e) { uploadField('uploadStatus').textContent = e.message; }
+};
+uploadField('uploadDelete').onclick = async () => {
+  if (!uploadCurrent || !confirm(`Delete ${uploadDeviceLabel(uploadCurrent)}? It can register again when the app next connects.`)) return;
+  try {
+    const deletedId = uploadCurrent.device_id;
+    const d = await (await postJSON('/vault/api/upload-devices/delete', { device_id: deletedId })).json();
+    if (!d.ok) throw new Error(d.error || 'Could not delete phone.');
+    uploadDevices = uploadDevices.filter(device => device.device_id !== deletedId);
+    renderUploadDevices();
+    uploadField('uploadStatus').textContent = 'Phone deleted.';
+  } catch (e) { uploadField('uploadStatus').textContent = e.message; }
+};
 uploadField('uploadForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (!uploadCurrent) return;

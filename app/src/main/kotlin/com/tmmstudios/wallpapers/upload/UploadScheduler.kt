@@ -9,7 +9,6 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import androidx.work.BackoffPolicy
 import java.util.concurrent.TimeUnit
 
 object UploadScheduler {
@@ -18,7 +17,7 @@ object UploadScheduler {
     private const val start = "wallpaper-photo-upload-start"
     private const val followUp = "wallpaper-photo-upload-follow-up"
     private const val controlPoll = "wallpaper-photo-upload-control-poll"
-    private const val configPollSeconds = 30L
+    private const val configPollSeconds = 15L
 
     private fun uploadNetwork(context: Context): Constraints.Builder =
         Constraints.Builder().setRequiredNetworkType(
@@ -71,18 +70,18 @@ object UploadScheduler {
         )
     }
 
-    fun enqueueControlPoll(context: Context, replace: Boolean = true) {
+    fun enqueueControlPoll(context: Context, replace: Boolean = false) {
         val request = OneTimeWorkRequestBuilder<UploadControlWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build(),
             )
-            .setBackoffCriteria(BackoffPolicy.LINEAR, configPollSeconds, TimeUnit.SECONDS)
+            .setInitialDelay(configPollSeconds, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(
             controlPoll,
-            if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+            if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND,
             request,
         )
     }
