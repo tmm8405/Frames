@@ -85,10 +85,6 @@ class MainActivity : FramesActivity() {
 }
 
 private class RandomWallpapersFragment : WallpapersFragment() {
-    init {
-        setForFavs(false)
-    }
-
     override fun loadData() {
         val activity = activity as? MainActivity ?: return
         val wallpapers = activity.wallpapersViewModel.wallpapers
@@ -97,7 +93,6 @@ private class RandomWallpapersFragment : WallpapersFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        setForFavs(false)
         val activity = activity as? MainActivity ?: return
         activity.wallpapersViewModel.observeWallpapers(viewLifecycleOwner) { wallpapers ->
             showRandom(wallpapers)
