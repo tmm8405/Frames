@@ -48,7 +48,7 @@ jobs:
         run: chmod +x gradlew; chmod +x gradle/wrapper/gradle-wrapper.jar
 
       - name: Prepare persistent signing key
-        if: ${{ secrets.TMM_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.TMM_KEYSTORE_BASE64 != '' }}
         env:
           TMM_KEYSTORE_BASE64: ${{ secrets.TMM_KEYSTORE_BASE64 }}
         run: |
