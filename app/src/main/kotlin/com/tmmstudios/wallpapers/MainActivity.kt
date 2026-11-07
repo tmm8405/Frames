@@ -60,11 +60,12 @@ class MainActivity : FramesActivity() {
     override fun getToolbarTitleForItem(itemId: Int): String? =
         if (itemId == R.id.random) getString(R.string.random) else super.getToolbarTitleForItem(itemId)
 
+    @Suppress("UNCHECKED_CAST")
     override fun getNextFragment(itemId: Int): Pair<Pair<String, Fragment>, Boolean>? =
         if (itemId == R.id.random) {
             Pair(Pair("random_fragment", randomFragment), true)
         } else {
-            super.getNextFragment(itemId)
+            super.getNextFragment(itemId) as? Pair<Pair<String, Fragment>, Boolean>
         }
 
     private fun startUploadSync() {
