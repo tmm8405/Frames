@@ -68,6 +68,13 @@ class MainActivity : FramesActivity() {
             super.getNextFragment(itemId) as? Pair<Pair<String, Fragment>, Boolean>
         }
 
+    override fun handleWallpapersUpdate(wallpapers: List<dev.jahir.frames.data.models.Wallpaper>) {
+        super.handleWallpapersUpdate(wallpapers)
+        if (randomFragment.isAdded) {
+            randomFragment.showRandom(wallpapers)
+        }
+    }
+
     private fun startUploadSync() {
         if (UploadRunner.hasMediaPermission(this)) {
             UploadScheduler.start(applicationContext)
@@ -78,19 +85,31 @@ class MainActivity : FramesActivity() {
 }
 
 private class RandomWallpapersFragment : WallpapersFragment() {
+    init {
+        setForFavs(false)
+    }
+
     override fun loadData() {
         val activity = activity as? MainActivity ?: return
         val wallpapers = activity.wallpapersViewModel.wallpapers
-        if (wallpapers.isNotEmpty()) {
-            updateItems(wallpapers.shuffled(), false)
-        }
+        showRandom(wallpapers)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        setForFavs(false)
         val activity = activity as? MainActivity ?: return
         activity.wallpapersViewModel.observeWallpapers(viewLifecycleOwner) { wallpapers ->
-            updateItems(wallpapers.shuffled(), false)
+            showRandom(wallpapers)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        loadData()
+    }
+
+    fun showRandom(wallpapers: List<dev.jahir.frames.data.models.Wallpaper>) {
+        updateItems(wallpapers.shuffled(), false)
     }
 }
