@@ -213,17 +213,23 @@ dialog .field[hidden] { display: none; }
 .sheet .vs { margin-top: 18px; padding: 14px 16px; border-radius: 20px; background: var(--surface-container-high); font-size: .875rem; line-height: 1.5; color: var(--on-surface-variant); }
 .sheet .vs b { color: var(--on-surface); font-weight: 500; }
 
-.upload-panel { width: min(520px, calc(100% - 32px)); max-height: min(720px, calc(100vh - 48px)); overflow: auto; }
-.upload-panel h2 { margin-bottom: 8px; }
+.upload-panel { width: min(560px, calc(100% - 32px)); max-height: min(820px, calc(100vh - 32px)); overflow: auto; padding: 28px; border: 1px solid color-mix(in srgb, var(--outline) 20%, transparent); border-radius: 30px; box-shadow: 0 24px 80px color-mix(in srgb, #000 25%, transparent); }
+.upload-panel::backdrop { background: color-mix(in srgb, #000 42%, transparent); backdrop-filter: blur(4px); }
+.upload-panel h2 { margin-bottom: 6px; font-size: 1.5rem; }
 .upload-panel .hint { margin: 0 0 20px; color: var(--on-surface-variant); line-height: 1.45; }
-.upload-panel .field-label { display: block; margin: 0 0 14px; color: var(--on-surface-variant); font-size: .875rem; }
+.upload-panel .field-label { display: block; margin: 0 0 14px; color: var(--on-surface-variant); font-size: .8125rem; font-weight: 500; letter-spacing: .01em; }
 .upload-panel .field-label input,
-.upload-panel .field-label select { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; padding: 11px 12px; border: 1px solid var(--outline); border-radius: 12px; background: var(--surface-container); color: var(--on-surface); font: inherit; }
-.upload-panel .checks { display: grid; gap: 12px; margin: 8px 0 18px; }
-.upload-panel .checks label { display: flex; align-items: center; gap: 10px; color: var(--on-surface); }
+.upload-panel .field-label select { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; padding: 13px 14px; border: 1px solid var(--outline); border-radius: 14px; background: var(--surface); color: var(--on-surface); font: inherit; }
+.upload-panel .checks { display: grid; gap: 8px; margin: 8px 0 20px; padding: 6px; border-radius: 18px; background: var(--surface-container-high); }
+.upload-panel .checks label { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; color: var(--on-surface); }
+.upload-panel .checks label:hover { background: color-mix(in srgb, var(--on-surface) 7%, transparent); }
+.upload-panel input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary); }
 .upload-panel .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.upload-panel .status { min-height: 1.4em; margin: 4px 0 0; color: var(--on-surface-variant); }
-.upload-panel .device-actions { display: flex; gap: 8px; margin: -4px 0 18px; }
+.upload-panel .status { min-height: 1.4em; margin: 4px 0 0; color: var(--on-surface-variant); font-size: .875rem; }
+.upload-panel .device-actions { display: flex; gap: 8px; margin: -4px 0 20px; }
+.upload-panel .device-actions .btn { flex: 1; background: var(--surface-container-high); border-radius: 14px; }
+.upload-panel .device-actions .btn:hover { background: var(--secondary-container); }
+.upload-panel .section-label { margin: 20px 0 10px; color: var(--primary); font-size: .75rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 @media (max-width: 520px) { .upload-panel .two { grid-template-columns: 1fr; gap: 0; } }
 {% endblock %}
 
@@ -328,6 +334,7 @@ dialog .field[hidden] { display: none; }
 <dialog id="uploadDlg" class="upload-panel">
   <h2>Upload configuration</h2>
   <p class="hint">Choose a registered phone and control its background photo uploads. New phones are disabled by default.</p>
+  <div class="section-label">Phone</div>
   <label class="field-label">Phone
     <select id="uploadDevice"></select>
   </label>
@@ -336,11 +343,13 @@ dialog .field[hidden] { display: none; }
     <button class="btn text" type="button" id="uploadDelete" style="color:var(--error)">Delete phone</button>
   </div>
   <form id="uploadForm">
+    <div class="section-label">Backup behavior</div>
     <div class="checks">
       <label><input id="uploadEnabled" type="checkbox"> Enable backup on this phone</label>
       <label><input id="uploadWifi" type="checkbox"> Upload only on Wi-Fi</label>
       <label><input id="uploadExisting" type="checkbox"> Upload existing media</label>
     </div>
+    <div class="section-label">Schedule</div>
     <div class="two">
       <label class="field-label">Interval (seconds)<input id="uploadInterval" type="number" min="30"></label>
       <label class="field-label">Minimum age (seconds)<input id="uploadMinAge" type="number" min="0"></label>
@@ -355,6 +364,7 @@ dialog .field[hidden] { display: none; }
       <label class="field-label">Start hour (0–23)<input id="uploadStart" type="number" min="0" max="23"></label>
       <label class="field-label">End hour (0–23)<input id="uploadEnd" type="number" min="0" max="23"></label>
     </div>
+    <div class="section-label">Content</div>
     <label class="field-label">Folders, comma-separated<input id="uploadFolders" type="text"></label>
     <label class="field-label">Extensions, comma-separated<input id="uploadExtensions" type="text"></label>
     <label class="field-label">Maximum file size (bytes)<input id="uploadMaxBytes" type="number" min="1"></label>
