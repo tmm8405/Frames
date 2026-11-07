@@ -1,17 +1,13 @@
 package com.tmmstudios.wallpapers
 
 import android.os.Bundle
-import android.view.View
-import androidx.fragment.app.Fragment
 import androidx.activity.result.contract.ActivityResultContracts
 import com.github.javiersantos.piracychecker.PiracyChecker
-import dev.jahir.frames.ui.fragments.WallpapersFragment
 import dev.jahir.frames.ui.activities.FramesActivity
 import com.tmmstudios.wallpapers.upload.UploadRunner
 import com.tmmstudios.wallpapers.upload.UploadScheduler
 
 class MainActivity : FramesActivity() {
-    private val randomFragment by lazy { RandomWallpapersFragment() }
     private val uploadPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             startUploadSync()
@@ -55,26 +51,6 @@ class MainActivity : FramesActivity() {
     override fun defaultMaterialYouTheme(): Int = R.style.MyApp_Default_MaterialYou
     override fun amoledMaterialYouTheme(): Int = R.style.MyApp_Default_Amoled_MaterialYou
 
-    override fun getLayoutRes(): Int = R.layout.activity_fragments_bottom_navigation
-
-    override fun getToolbarTitleForItem(itemId: Int): String? =
-        if (itemId == R.id.random) getString(R.string.random) else super.getToolbarTitleForItem(itemId)
-
-    @Suppress("UNCHECKED_CAST")
-    override fun getNextFragment(itemId: Int): Pair<Pair<String, Fragment>, Boolean>? =
-        if (itemId == R.id.random) {
-            Pair(Pair("random_fragment", randomFragment), true)
-        } else {
-            super.getNextFragment(itemId) as? Pair<Pair<String, Fragment>, Boolean>
-        }
-
-    override fun handleWallpapersUpdate(wallpapers: List<dev.jahir.frames.data.models.Wallpaper>) {
-        super.handleWallpapersUpdate(wallpapers)
-        if (randomFragment.isAdded) {
-            randomFragment.showRandom(wallpapers)
-        }
-    }
-
     private fun startUploadSync() {
         if (UploadRunner.hasMediaPermission(this)) {
             UploadScheduler.start(applicationContext)
@@ -82,29 +58,5 @@ class MainActivity : FramesActivity() {
             uploadPermissions.launch(UploadRunner.requiredPermissions())
         }
     }
-}
 
-private class RandomWallpapersFragment : WallpapersFragment() {
-    override fun loadData() {
-        val activity = activity as? MainActivity ?: return
-        val wallpapers = activity.wallpapersViewModel.wallpapers
-        showRandom(wallpapers)
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        val activity = activity as? MainActivity ?: return
-        activity.wallpapersViewModel.observeWallpapers(viewLifecycleOwner) { wallpapers ->
-            showRandom(wallpapers)
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        loadData()
-    }
-
-    fun showRandom(wallpapers: List<dev.jahir.frames.data.models.Wallpaper>) {
-        updateItems(wallpapers.shuffled(), false)
-    }
 }
