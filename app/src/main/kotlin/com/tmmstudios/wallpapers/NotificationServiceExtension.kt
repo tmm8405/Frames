@@ -1,6 +1,5 @@
 package com.tmmstudios.wallpapers
 
-/* TODO: Remove comment marks to enable
 import android.content.Context
 import com.onesignal.OSNotificationReceivedEvent
 import com.onesignal.OneSignal.OSRemoteNotificationReceivedHandler
@@ -30,4 +29,3 @@ class NotificationServiceExtension : OSRemoteNotificationReceivedHandler {
         notificationReceivedEvent.complete(mutableNotification)
     }
 }
-*/
