@@ -45,3 +45,4 @@ jobs:
 
       - name: Build
         run: ./gradlew clean test --full-stacktrace
+
