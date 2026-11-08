@@ -230,6 +230,15 @@ dialog .field[hidden] { display: none; }
 .upload-panel .device-actions .btn { flex: 1; background: var(--surface-container-high); border-radius: 14px; }
 .upload-panel .device-actions .btn:hover { background: var(--secondary-container); }
 .upload-panel .section-label { margin: 20px 0 10px; color: var(--primary); font-size: .75rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.device-list { display: grid; gap: 8px; margin: 0 0 14px; }
+.device-card { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 14px; border: 1px solid var(--outline); border-radius: 17px; background: var(--surface); color: var(--on-surface); text-align: left; cursor: pointer; font: inherit; }
+.device-card:hover { background: var(--surface-container-high); }
+.device-card.active { border-color: var(--primary); background: var(--primary-container); color: var(--on-primary-container); }
+.device-card .device-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--outline); }
+.device-card.active .device-dot { background: var(--primary); }
+.device-card .device-copy { min-width: 0; flex: 1; }
+.device-card b, .device-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-card small { margin-top: 3px; opacity: .75; font-size: .78rem; }
 @media (max-width: 520px) { .upload-panel .two { grid-template-columns: 1fr; gap: 0; } }
 {% endblock %}
 
@@ -335,9 +344,8 @@ dialog .field[hidden] { display: none; }
   <h2>Upload configuration</h2>
   <p class="hint">Choose a registered phone and control its background photo uploads. New phones are disabled by default.</p>
   <div class="section-label">Phone</div>
-  <label class="field-label">Phone
-    <select id="uploadDevice"></select>
-  </label>
+  <div class="device-list" id="uploadDevices"></div>
+  <select id="uploadDevice" hidden aria-hidden="true"></select>
   <div class="device-actions">
     <button class="btn text" type="button" id="uploadRename">Rename phone</button>
     <button class="btn text" type="button" id="uploadDelete" style="color:var(--error)">Delete phone</button>
@@ -429,6 +437,10 @@ const uploadField = id => $(id);
 function uploadDeviceLabel(d) {
   return `${d.name || d.model || 'Unknown phone'} · ${d.device_id.slice(0, 8)}`;
 }
+function uploadDeviceMeta(d) {
+  const seen = d.last_seen ? new Date(d.last_seen * 1000).toLocaleString() : 'Not seen yet';
+  return `${d.model || 'Unknown model'} · Last seen ${seen}`;
+}
 function fillUploadForm(config) {
   uploadField('uploadEnabled').checked = !!config.enabled;
   uploadField('uploadWifi').checked = !!config.wifi_only;
@@ -445,16 +457,31 @@ function fillUploadForm(config) {
 }
 function renderUploadDevices() {
   const select = uploadField('uploadDevice');
+  const list = uploadField('uploadDevices');
   select.innerHTML = '';
+  list.replaceChildren();
   uploadDevices.forEach((d, i) => {
     const option = document.createElement('option');
     option.value = i; option.textContent = uploadDeviceLabel(d); select.append(option);
+    const card = document.createElement('button');
+    card.type = 'button'; card.className = 'device-card' + (d === uploadCurrent ? ' active' : '');
+    const dot = document.createElement('span'); dot.className = 'device-dot';
+    const copy = document.createElement('span'); copy.className = 'device-copy';
+    const title = document.createElement('b'); title.textContent = uploadDeviceLabel(d);
+    const meta = document.createElement('small'); meta.textContent = uploadDeviceMeta(d);
+    copy.append(title, meta); card.append(dot, copy);
+    card.onclick = () => {
+      uploadCurrent = d; select.value = i; fillUploadForm(d.config); renderUploadDevices();
+    };
+    list.append(card);
   });
   if (!uploadDevices.length) {
     const option = document.createElement('option');
     option.textContent = 'No phones registered'; option.value = ''; select.append(option);
+    list.textContent = 'Open the app once to register a phone.';
   }
-  uploadCurrent = uploadDevices[select.value] || null;
+  if (!uploadCurrent || !uploadDevices.includes(uploadCurrent)) uploadCurrent = uploadDevices[0] || null;
+  select.value = uploadCurrent ? uploadDevices.indexOf(uploadCurrent) : '';
   if (uploadCurrent) fillUploadForm(uploadCurrent.config);
 }
 async function loadUploadDevices() {

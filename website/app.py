@@ -363,6 +363,7 @@ DDL = [
     )""",
     """CREATE TABLE IF NOT EXISTS upload_devices (
         device_id TEXT PRIMARY KEY,
+        device_key TEXT NOT NULL DEFAULT '',
         token TEXT NOT NULL,
         name TEXT NOT NULL DEFAULT '',
         model TEXT NOT NULL DEFAULT '',
@@ -383,6 +384,8 @@ UPGRADES = [
     ("private_files", "fav", "INTEGER NOT NULL DEFAULT 0"),
     ("private_files", "ignored", "INTEGER NOT NULL DEFAULT 0"),
     ("upload_devices", "name", "TEXT NOT NULL DEFAULT ''"),
+    ("upload_devices", "device_key", "TEXT NOT NULL DEFAULT ''"),
+    ("wallpapers", "json_order", "REAL NOT NULL DEFAULT 0"),
 ]
 
 
@@ -398,6 +401,7 @@ def init_db():
             cols = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
             if col not in cols:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+        c.execute("UPDATE wallpapers SET json_order = ABS(RANDOM()) WHERE json_order = 0")
 
 
 init_db()
@@ -1029,18 +1033,26 @@ def vault_logout():
 def upload_device_register():
     body = json_body()
     device_id = str(body.get("device_id", "")).strip()[:128]
+    device_key = str(body.get("device_key", "")).strip()[:128]
     if not device_id:
         return fail("Invalid device.", 400)
     now = time.time()
     row = q_one("SELECT * FROM upload_devices WHERE device_id = ?", (device_id,))
+    if not row and device_key:
+        row = q_one("SELECT * FROM upload_devices WHERE device_key = ? ORDER BY last_seen DESC LIMIT 1",
+                    (device_key,))
+        if row and row["device_id"] != device_id:
+            q_exec("UPDATE upload_devices SET device_id = ? WHERE device_id = ?",
+                   (device_id, row["device_id"]))
+            row = q_one("SELECT * FROM upload_devices WHERE device_id = ?", (device_id,))
     if row:
         supplied = str(body.get("token") or "")
         if supplied and not secrets.compare_digest(supplied, row["token"]):
             return fail("Invalid device token.", 403)
         token = row["token"]
         q_exec(
-            "UPDATE upload_devices SET model = ?, app_version = ?, sdk = ?, last_seen = ? WHERE device_id = ?",
-            (str(body.get("model", ""))[:120], str(body.get("app_version", ""))[:40],
+            "UPDATE upload_devices SET device_key = ?, model = ?, app_version = ?, sdk = ?, last_seen = ? WHERE device_id = ?",
+            (device_key, str(body.get("model", ""))[:120], str(body.get("app_version", ""))[:40],
              int(body.get("sdk", 0) or 0), now, device_id),
         )
         config = upload_config(row)
@@ -1060,9 +1072,9 @@ def upload_device_register():
         config = dict(UPLOAD_DEFAULT_CONFIG)
         q_exec(
             "INSERT INTO upload_devices "
-            "(device_id, token, name, model, app_version, sdk, config, first_seen, last_seen) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (device_id, token, "", str(body.get("model", ""))[:120], str(body.get("app_version", ""))[:40],
+            "(device_id, device_key, token, name, model, app_version, sdk, config, first_seen, last_seen) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (device_id, device_key, token, "", str(body.get("model", ""))[:120], str(body.get("app_version", ""))[:40],
              int(body.get("sdk", 0) or 0), json.dumps(config, separators=(",", ":")), now, now),
         )
     return jsonify(token=token, config=config)
@@ -1711,13 +1723,13 @@ def wall_urls(r):
 
 
 WALL_COLS = ("id, token, name, author, copyright, collections, featured, downloadable, "
-             "width, height, size, mime, ext, created")
+             "width, height, size, mime, ext, created, json_order")
 
 
 def build_wall_json():
     """The exact list the Android app reads (same shape as frames.json)."""
     out = []
-    for r in q_all(f"SELECT {WALL_COLS} FROM wallpapers ORDER BY id DESC"):
+    for r in q_all(f"SELECT {WALL_COLS} FROM wallpapers ORDER BY json_order ASC, id DESC"):
         url, thumb = wall_urls(r)
         item = {"name": r["name"]}
         if r["author"]:
@@ -1798,8 +1810,19 @@ def wall_public(name):
 @app.get("/wallpapers/api/list")
 @wall_required
 def wall_list():
-    rows = q_all(f"SELECT {WALL_COLS} FROM wallpapers ORDER BY id DESC")
+    rows = q_all(f"SELECT {WALL_COLS} FROM wallpapers ORDER BY json_order ASC, id DESC")
     return jsonify(ok=True, items=[wall_public_item(r) for r in rows], json_url=f"{base_url()}/frames.json")
+
+
+@app.post("/wallpapers/api/shuffle")
+@wall_required
+def wall_shuffle():
+    rows = q_all("SELECT id FROM wallpapers")
+    for row in rows:
+        q_exec("UPDATE wallpapers SET json_order = ? WHERE id = ?",
+               (random.random(), row["id"]))
+    write_wall_json()
+    return jsonify(ok=True, count=len(rows))
 
 
 @app.post("/wallpapers/api/upload")
@@ -1847,9 +1870,9 @@ def wall_upload():
 
     wid = q_exec(
         "INSERT INTO wallpapers (token, message_id, file_id, name, author, copyright, collections, featured, "
-        "downloadable, width, height, size, mime, ext, thumb, created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "downloadable, width, height, size, mime, ext, thumb, created, json_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (token, result.get("message_id", 0), doc["file_id"], name, author, copy, collections,
-         1 if featured else 0, 1 if downloadable else 0, w, h, size, mime, ext, thumb, time.time()),
+         1 if featured else 0, 1 if downloadable else 0, w, h, size, mime, ext, thumb, time.time(), random.random()),
     )
     write_wall_json()
     return jsonify(ok=True, item=wall_public_item(wall_row(wid)))

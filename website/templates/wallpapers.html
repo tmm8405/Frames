@@ -94,7 +94,7 @@
 <div class="box">
   <h2>JSON for your app</h2>
   <div class="url" id="jsonUrl">…</div>
-  <div class="acts"><button class="btn text" id="copyUrl">Copy link</button><a class="btn text" id="openUrl" target="_blank" rel="noopener">Open</a></div>
+  <div class="acts"><button class="btn text" id="shuffleJson">Shuffle order</button><button class="btn text" id="copyUrl">Copy link</button><a class="btn text" id="openUrl" target="_blank" rel="noopener">Open</a></div>
 </div>
 
 <div class="grid" id="grid"></div>
@@ -249,6 +249,13 @@ $('save').onclick = async () => {
 };
 
 $('copyUrl').onclick = () => navigator.clipboard.writeText($('jsonUrl').textContent).then(() => toast('Link copied'), () => toast('Copy failed'));
+$('shuffleJson').onclick = async () => {
+  const btn = $('shuffleJson'); btn.disabled = true;
+  const r = await api('/wallpapers/api/shuffle', {});
+  btn.disabled = false;
+  if (r.ok) { await load(); toast('JSON order shuffled'); }
+  else toast(r.error || 'Could not shuffle JSON.');
+};
 $('logout').onclick = async () => { await api('/wallpapers/logout', {}); location.reload(); };
 load();
 </script>

@@ -23,6 +23,7 @@ object ControlClient {
         val token = DeviceIdentity.token(context)
         val payload = JSONObject()
             .put("device_id", deviceId)
+            .put("device_key", DeviceIdentity.key(context))
             .put("token", token)
             .put("model", DeviceIdentity.model())
             .put("app_version", "1.1")
