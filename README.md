@@ -11,6 +11,210 @@ Frames
 
 Free, feature-rich, easily customizable Android dashboard for wallpapers apps
 
+## Project build guide
+
+This repository contains the Frames Android wallpaper application and its supporting
+upload/control code. The branch `fix/device-dedup-json-shuffle-ui` contains the
+device-deduplication, JSON/shuffle UI, and wallpaper uploader changes currently being
+tested.
+
+### What to build
+
+The Android application is the `app` module. The normal development artifact is the
+debug APK:
+
+```text
+app/build/outputs/apk/debug/com.tmmstudios.wallpapers-v1.1-debug.apk
+```
+
+The APK has:
+
+- Application ID: `com.tmmstudios.wallpapers`
+- Version code: `381`
+- Version name: `1.1`
+- Minimum Android version: API 24
+- Compile/target Android version: API 37
+
+The repository also contains `website/`, a separate Python website for upload and
+wallpaper-related services. It is not part of the Android Gradle build.
+
+### Prerequisites
+
+Install the following before building locally:
+
+- JDK 17
+- Android SDK
+- Android SDK Platform 37
+- Android SDK Build-Tools 37.0.0
+- Git
+
+The project uses the Gradle Wrapper, so a separate Gradle installation is not
+required. The wrapper downloads and runs Gradle 9.6.0 from
+`gradle/wrapper/gradle-wrapper.properties`.
+
+Verify the Java and Android SDK environment:
+
+```bash
+java -version
+echo "$ANDROID_HOME"
+echo "$ANDROID_SDK_ROOT"
+```
+
+`JAVA_HOME` must point to JDK 17. `ANDROID_HOME` or `ANDROID_SDK_ROOT` must point
+to the Android SDK installation.
+
+### Build locally
+
+Clone the repository and switch to the branch:
+
+```bash
+git clone https://github.com/tmm8405/Frames.git
+cd Frames
+git switch fix/device-dedup-json-shuffle-ui
+```
+
+Make the wrapper executable, then run the same command used by CI:
+
+```bash
+chmod +x gradlew
+./gradlew clean test assembleDebug --full-stacktrace
+```
+
+The important parts of this command are:
+
+- `clean`: removes previous build outputs so stale resources cannot affect the result.
+- `test`: runs the available Gradle tests. This project may report no Android unit
+  tests when none are present.
+- `assembleDebug`: compiles, packages, and signs the debug APK with the default
+  debug signing key unless stable signing variables are provided.
+- `--full-stacktrace`: prints the complete Gradle failure cause.
+
+To build only the APK without cleaning:
+
+```bash
+./gradlew assembleDebug
+```
+
+To run the checks recommended before submitting changes:
+
+```bash
+./gradlew clean build
+```
+
+The generated APK is under `app/build/outputs/apk/debug/`. Do not use an APK from
+an older build directory when checking a branch; run `clean` first.
+
+### GitHub Actions build
+
+The workflow is `.github/workflows/build.yml`. It can run for pull requests and
+pushes to its configured branches, or be started manually with `workflow_dispatch`.
+The `fix/device-dedup-json-shuffle-ui` branch is normally built manually because
+it is not listed in the workflow's automatic push branch list.
+
+Start a build from GitHub CLI:
+
+```bash
+gh workflow run build.yml \
+  --repo tmm8405/Frames \
+  --ref fix/device-dedup-json-shuffle-ui
+```
+
+Find the run and follow its status:
+
+```bash
+gh run list \
+  --repo tmm8405/Frames \
+  --workflow build.yml \
+  --branch fix/device-dedup-json-shuffle-ui
+
+gh run watch RUN_ID --repo tmm8405/Frames --exit-status
+```
+
+The workflow performs these steps:
+
+1. Checks out the selected commit.
+2. Installs and selects JDK 17.
+3. Restores Gradle and Android build caches.
+4. Makes `gradlew` executable.
+5. Optionally writes the persistent signing keystore from the repository secrets.
+6. Runs `./gradlew clean test assembleDebug --full-stacktrace`.
+7. Uploads every debug APK as the `tmm-wallpapers-debug` artifact.
+
+Download the APK artifact after a successful run:
+
+```bash
+gh run download RUN_ID \
+  --repo tmm8405/Frames \
+  --name tmm-wallpapers-debug
+```
+
+The artifact contains the APK produced by that exact Git commit and CI
+environment. A successful build does not publish a release or install the APK on
+a device automatically.
+
+### Signing
+
+Local debug builds use the standard debug signing key unless all four variables
+below are set:
+
+```bash
+export TMM_KEYSTORE_PATH=/absolute/path/to/tmm-wallpapers.keystore
+export TMM_KEYSTORE_PASSWORD='keystore-password'
+export TMM_KEY_ALIAS='key-alias'
+export TMM_KEY_PASSWORD='key-password'
+./gradlew assembleDebug
+```
+
+GitHub Actions can use the stable keystore when these repository secrets are
+configured:
+
+- `TMM_KEYSTORE_BASE64`
+- `TMM_KEYSTORE_PASSWORD`
+- `TMM_KEY_ALIAS`
+- `TMM_KEY_PASSWORD`
+
+Never commit a keystore, password, private key, or base64-encoded secret to the
+repository. Without the stable signing secrets, CI still produces a valid
+debug-signed APK.
+
+### Common build failures
+
+**`Unsupported class file major version` or Java/Gradle errors**
+
+Use JDK 17. JDK 27 or another newer JDK is not the environment used by the
+workflow.
+
+**`SDK location not found` or missing Android platform**
+
+Install Android SDK Platform 37 and set `ANDROID_HOME` or `ANDROID_SDK_ROOT` to
+the SDK directory.
+
+**`Duplicate resources` for `mipmap-anydpi-v26/ic_launcher`**
+
+Do not place PNG files with the same resource names beside the adaptive-icon XML
+files in `app/src/main/res/mipmap-anydpi-v26/`. The API 26 launcher resources
+must have one definition for each name.
+
+**Build output appears unchanged**
+
+Run `./gradlew clean assembleDebug` and verify the APK timestamp, path, and
+branch before installing it.
+
+**Workflow does not start after pushing**
+
+Check the `push.branches` list in `.github/workflows/build.yml`. Start the branch
+manually with `gh workflow run ... --ref fix/device-dedup-json-shuffle-ui`, or
+open a pull request targeting `sample` or `master`.
+
+### Branch-specific resource fix
+
+This branch uses adaptive launcher XML resources in
+`app/src/main/res/mipmap-anydpi-v26/`. Duplicate PNG launcher resources in that
+same directory caused `:app:packageDebugResources` to fail. The conflicting PNG
+files were removed; density-specific launcher PNGs remain in their normal
+`mipmap-hdpi`, `mipmap-mdpi`, `mipmap-xhdpi`, `mipmap-xxhdpi`, and
+`mipmap-xxxhdpi` directories.
+
 <a target="_blank" href="http://jahir.dev/gh-releases/frames">
 <img src="https://jahir.dev/share/download_sample.svg?maxAge=432000" width="200"/>
 </a>
